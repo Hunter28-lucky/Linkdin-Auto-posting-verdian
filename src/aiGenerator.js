@@ -1,8 +1,68 @@
 const https = require('https');
 const db = require('./database');
 
-// Smart dynamic post templates across categories for instant offline generation
+// Smart dynamic post templates across categories
 const TEMPLATES_BY_TOPIC = {
+  'Hiring Remote Sales': [
+    {
+      hook: "🚨 WE ARE HIRING: Remote Sales Executives (Students & Freshers Welcome! 🎓)",
+      body: `Looking for a flexible way to earn from home without interfering with your studies or daily schedule?
+
+At Veridian Digital, we are expanding our remote sales team! 🚀
+
+Here is what makes this opportunity different:
+💻 100% Remote (Work from anywhere)
+⏰ Flexible Timing (Set your own hours)
+📚 Leads, Training & Proven Call Scripts Provided
+🎓 No prior sales experience needed
+💰 High Commission (Earn ₹4,500 per ₹15,000 website deal closed)
+
+👉 What you'll do:
+1. Reach out to local businesses who need a modern website or redesign
+2. Explain our digital services using our ready-made scripts
+3. Connect interested clients with our tech team to close the deal
+
+If you can talk to people and have a smartphone or laptop, you're ready to start.`,
+      cta: `📩 Ready to join? 
+Drop a comment "HIRING" below or send us a direct DM to get started today! 👇
+
+#Hiring #RemoteWork #SalesJobs #WorkFromHome #StudentsJobs #VeridianDigital #CareerOpportunity #CommissionBased`,
+      tags: ['#Hiring', '#RemoteWork', '#SalesJobs', '#StudentsJobs', '#VeridianDigital'],
+      image: '/assets/veridian-hiring-poster.jpg',
+    },
+    {
+      hook: "Want to earn ₹15,000 - ₹30,000/month from home just by making calls and closing website deals? 📈",
+      body: `Most students and freshers think they need 5 years of experience to make good money. You don't.
+
+Veridian Digital is hiring Remote Sales Associates:
+
+• Commission: ₹4,500 per closed website deal (₹15,000 deal size)
+• Hours: Fully flexible (1-3 hours a day)
+• Support: We provide verified leads and exact pitch scripts
+• Role: Call/message business owners & introduce our high-converting web solutions
+
+No technical skills required. We build the websites, you bring the client.`,
+      cta: `👉 Send a direct DM with "SALES" or comment below to apply now! 💬`,
+      tags: ['#Jobs #SalesExecutive #RemoteJobs #Veridian #FreelanceSales #Students'],
+      image: '/assets/veridian-hiring-poster.jpg',
+    },
+    {
+      hook: "College students & Job seekers: How to monetize your free time in 2026 👇",
+      body: `Instead of scrolling endlessly, learn high-income communication skills and earn commission on every project.
+
+We are actively onboarding Remote Sales Representatives at Veridian Digital:
+
+✓ Work from your phone/laptop
+✓ No fixed shift or commute
+✓ Complete pitch deck and guidance provided
+✓ Direct payout upon project sign-off
+
+Example: Close just 3 small business websites a week = ₹13,500/week in direct commission!`,
+      cta: `📩 DM us "START" or leave a comment below to get your onboarding kit today! 🚀`,
+      tags: ['#HiringNow #RemoteWork #PartTimeJob #Sales #VeridianDigital'],
+      image: '/assets/veridian-hiring-poster.jpg',
+    },
+  ],
   'AI & Tech Trends': [
     {
       hook: "AI isn't going to replace developers, but developers using AI are replacing those who don't.",
@@ -16,6 +76,7 @@ const TEMPLATES_BY_TOPIC = {
 The engineers winning in 2026 aren't just writing code—they are orchestrating systems.`,
       cta: "How are you incorporating AI into your daily engineering workflow?",
       tags: ['#ArtificialIntelligence', '#SoftwareEngineering', '#TechTrends', '#FutureOfTech', '#DeveloperTools'],
+      image: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1000&auto=format&fit=crop&q=80',
     },
     {
       hook: "90% of companies are building AI wrappers. The top 10% are building workflows.",
@@ -30,19 +91,7 @@ What actually creates enterprise value with AI:
 Don't just plug in an LLM. Design the end-to-end outcome.`,
       cta: "What's the most impactful AI tool or workflow your team implemented this quarter?",
       tags: ['#AI', '#ProductManagement', '#TechLeadership', '#Innovation', '#B2BTech'],
-    },
-    {
-      hook: "The biggest bottleneck in tech today isn't compute or algorithms—it's data quality.",
-      body: `You can have the most sophisticated models, but if your data is dirty, unstandardized, or siloed, your results will fail.
-
-3 things every engineering team should prioritize before investing in advanced AI:
-1. Strict schema validation and cleanup pipelines
-2. High-signal logging and telemetry
-3. Clear data governance and versioning
-
-Fix the foundations first; the magic comes after.`,
-      cta: "Agree or disagree? Drop your thoughts below 👇",
-      tags: ['#DataEngineering', '#AIInfrastructure', '#MachineLearning', '#TechStrategy'],
+      image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1000&auto=format&fit=crop&q=80',
     },
   ],
   'Software Engineering Tips': [
@@ -59,31 +108,7 @@ Before you build that abstract factory or custom caching layer:
 Simplicity is a feature, not a compromise.`,
       cta: "What is one architectural rule you swear by?",
       tags: ['#Coding', '#WebDev', '#SoftwareArchitecture', '#CleanCode', '#DevCommunity'],
-    },
-    {
-      hook: "Junior Dev: 'It works on my machine!'\nSenior Dev: 'Then we'll ship your machine.'\nStaff Dev: 'Automate container builds and reproducible tests.'",
-      body: `Here are 3 habits that accelerated my engineering career more than learning any new framework:
-
-1. Learning to debug with system logs and profilers instead of console.log.
-2. Writing clear documentation that saves the next developer 5 hours of confusion.
-3. Reviewing PRs for architecture and edge cases, not just formatting.
-
-The best engineers build tools and processes that make the entire team 10x faster.`,
-      cta: "What advice would you give to someone starting their tech journey today?",
-      tags: ['#SoftwareEngineering', '#CareerAdvice', '#Mentorship', '#DevLife'],
-    },
-    {
-      hook: "Most APIs fail in production not because of traffic, but because of unhandled edge cases.",
-      body: `Here is a 4-point checklist before marking your API endpoint 'production-ready':
-
-✓ Rate limiting & request throttling configured
-✓ Clear and structured error responses (never leak stack traces)
-✓ Idempotency keys for payment and mutating requests
-✓ Comprehensive timeouts on all downstream external services
-
-Build with resilience in mind from Day 1.`,
-      cta: "Save this checklist for your next backend deployment 📌",
-      tags: ['#Backend', '#API', '#SystemDesign', '#CloudComputing', '#FullStack'],
+      image: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1000&auto=format&fit=crop&q=80',
     },
   ],
   'Career & Productivity Growth': [
@@ -99,35 +124,7 @@ Build with resilience in mind from Day 1.`,
 Consistency and focus beat chaotic hustle every single time.`,
       cta: "What is your #1 productivity hack during a busy week?",
       tags: ['#Productivity', '#CareerGrowth', '#WorkSmart', '#Focus', '#TimeManagement'],
-    },
-    {
-      hook: "The most valuable career skill in 2026 isn't just technical knowledge. It's concise communication.",
-      body: `You can build the best system in the world, but if you cannot explain its value to stakeholders, your impact remains invisible.
-
-3 rules for communicating with clarity:
-1. Bottom Line Up Front (BLUF): State the conclusion or ask in the first sentence.
-2. Eliminate jargon when speaking to cross-functional partners.
-3. Quantify impact: Use metrics (e.g. 'reduced latency by 35%') instead of adjectives.
-
-Clarity builds trust. Trust builds careers.`,
-      cta: "How do you prepare for critical stakeholder presentations?",
-      tags: ['#Leadership', '#Communication', '#CareerAdvice', '#ExecutivePresence'],
-    },
-  ],
-  'Future of Work': [
-    {
-      hook: "Remote work didn't fail. Lazy management failed.",
-      body: `Forced return-to-office mandates often disguise a deeper problem: lack of asynchronous culture and outcome-based measurement.
-
-What high-trust remote teams do differently:
-• Document decisions in writing (RFCs) rather than holding endless syncs.
-• Measure deliverables and business impact, not active hours or green status dots.
-• Respect timezones and provide deep work quiet hours.
-• Foster intentional, high-quality in-person offsites.
-
-Empower people with autonomy and accountability, and watch productivity soar.`,
-      cta: "What's your stance on remote vs hybrid work in 2026? Let's discuss.",
-      tags: ['#FutureOfWork', '#RemoteWork', '#Leadership', '#CompanyCulture', '#Management'],
+      image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1000&auto=format&fit=crop&q=80',
     },
   ],
 };
@@ -136,7 +133,7 @@ Empower people with autonomy and accountability, and watch productivity soar.`,
  * Generate AI post using Google Gemini API if key is available,
  * or fallback to smart dynamic post engine.
  */
-async function generatePost({ topic = 'AI & Tech Trends', tone = 'engaging', customPrompt = '' }) {
+async function generatePost({ topic = 'Hiring Remote Sales', tone = 'engaging', customPrompt = '' }) {
   const settings = db.getSettings();
   const apiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY;
 
@@ -158,32 +155,31 @@ async function generatePost({ topic = 'AI & Tech Trends', tone = 'engaging', cus
 function generateWithGemini(apiKey, topic, tone, customPrompt) {
   return new Promise((resolve, reject) => {
     const promptInstructions = `
-You are an expert LinkedIn creator and ghostwriter who writes high-engagement, authentic, thought-provoking posts.
+You are a viral LinkedIn copywriter for Veridian Digital.
 
+Company: Veridian Digital (Growth. Digital. Done Right.)
 Topic: ${topic}
-Tone: ${tone} (e.g. engaging, thought-provoking, educational, storytelling)
-${customPrompt ? `Custom Instructions / Focus: ${customPrompt}` : ''}
+Tone: ${tone} (viral, high energy, relatable for young audience/students)
+${customPrompt ? `Custom Context: ${customPrompt}` : ''}
 
-Rules:
-1. Start with a scroll-stopping, crisp 1-2 sentence hook.
-2. Use clean whitespace and line breaks (short paragraphs, 1-2 lines each) for maximum mobile readability.
-3. Provide actionable insights, structured bullet points, or a memorable perspective.
-4. End with a thoughtful question or Call-to-Action to invite comments.
-5. Include 3-5 relevant hashtags at the bottom.
-6. Do NOT use cliché buzzwords like "delve", "testament", "tapestry", "game changer" or generic robotic AI intros.
-7. Return ONLY the final ready-to-publish post text.
+Goal:
+If this is a Hiring / Sales post:
+- Target young audience, college students, freshers, remote job seekers.
+- Highlight: Work from home, flexible timing, leads & call scripts provided, no experience needed, high commission (₹4,500 on ₹15,000 website deal).
+- Strong CTA: "DM to apply" or "Comment HIRING below".
+
+Formatting Rules:
+1. Start with a scroll-stopping 1-line hook with emoji.
+2. Short 1-2 sentence paragraphs for mobile readability.
+3. Clean bullet points.
+4. Clear viral CTA at the bottom.
+5. 4-6 relevant hashtags.
+6. Return ONLY the ready-to-post text.
 `;
 
     const requestBody = JSON.stringify({
-      contents: [
-        {
-          parts: [{ text: promptInstructions }],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.75,
-        maxOutputTokens: 800,
-      },
+      contents: [{ parts: [{ text: promptInstructions }] }],
+      generationConfig: { temperature: 0.75, maxOutputTokens: 800 },
     });
 
     const options = {
@@ -206,11 +202,16 @@ Rules:
           if (res.statusCode >= 200 && res.statusCode < 300) {
             const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
             if (text) {
+              const defaultImage = topic === 'Hiring Remote Sales'
+                ? '/assets/veridian-hiring-poster.jpg'
+                : generateImageConcept(topic, text);
+
               resolve({
                 content: text.trim(),
                 topic,
                 tone,
                 engine: 'Gemini 1.5 Flash',
+                imageUrl: defaultImage,
               });
               return;
             }
@@ -233,14 +234,14 @@ Rules:
  */
 function generateDynamicTemplate(topic, tone, customPrompt) {
   const categories = Object.keys(TEMPLATES_BY_TOPIC);
-  const matchedTopic = categories.find((c) => c.toLowerCase() === topic.toLowerCase()) || categories[0];
-  const list = TEMPLATES_BY_TOPIC[matchedTopic] || TEMPLATES_BY_TOPIC['AI & Tech Trends'];
+  const matchedTopic = categories.find((c) => c.toLowerCase() === topic.toLowerCase()) || 'Hiring Remote Sales';
+  const list = TEMPLATES_BY_TOPIC[matchedTopic] || TEMPLATES_BY_TOPIC['Hiring Remote Sales'];
   const template = list[Math.floor(Math.random() * list.length)];
 
-  let postText = `${template.hook}\n\n${template.body}\n\n${template.cta}\n\n${template.tags.join(' ')}`;
+  let postText = `${template.hook}\n\n${template.body}\n\n${template.cta}`;
 
-  if (customPrompt) {
-    postText = `💡 Quick Insight on ${customPrompt}:\n\n` + postText;
+  if (customPrompt && !customPrompt.toLowerCase().includes('hiring')) {
+    postText = `💡 Note from Veridian Digital:\n${customPrompt}\n\n` + postText;
   }
 
   return {
@@ -248,21 +249,22 @@ function generateDynamicTemplate(topic, tone, customPrompt) {
     topic: matchedTopic,
     tone: tone || 'engaging',
     engine: 'Smart Dynamic Engine',
+    imageUrl: template.image || '/assets/veridian-hiring-poster.jpg',
   };
 }
 
-/**
- * Generate matching visual / image concept for a post
- */
 function generateImageConcept(topic, postText) {
+  if (topic === 'Hiring Remote Sales' || postText.includes('HIRING') || postText.includes('Veridian')) {
+    return '/assets/veridian-hiring-poster.jpg';
+  }
+
   const visualIdeas = {
     'AI & Tech Trends': 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1000&auto=format&fit=crop&q=80',
     'Software Engineering Tips': 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1000&auto=format&fit=crop&q=80',
     'Career & Productivity Growth': 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1000&auto=format&fit=crop&q=80',
-    'Future of Work': 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1000&auto=format&fit=crop&q=80',
   };
 
-  return visualIdeas[topic] || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1000&auto=format&fit=crop&q=80';
+  return visualIdeas[topic] || '/assets/veridian-hiring-poster.jpg';
 }
 
 module.exports = {

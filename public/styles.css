@@ -468,11 +468,42 @@ body {
   border-radius: 20px;
 }
 
-/* Target Selector Options in Studio */
-.target-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem;
+/* Hiring Quick Banner */
+.hiring-quick-banner {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(6, 182, 212, 0.1) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
+}
+
+.hiring-banner-text h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #34d399;
+}
+
+.hiring-banner-text p {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.btn-hiring-glow {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+  white-space: nowrap;
+}
+
+.btn-hiring-glow:hover {
+  box-shadow: 0 0 22px rgba(16, 185, 129, 0.65);
+  transform: translateY(-1px);
 }
 
 .target-option-btn {

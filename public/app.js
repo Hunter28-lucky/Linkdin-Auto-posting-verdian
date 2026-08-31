@@ -408,6 +408,18 @@ function bindEventListeners() {
   // Generate AI Post
   elements.btnGenerateAi.addEventListener('click', handleGenerateAiPost);
 
+  // 1-Click Quick Hiring Campaign Generator
+  const btnQuickHiring = document.getElementById('btn-quick-hiring');
+  if (btnQuickHiring) {
+    btnQuickHiring.addEventListener('click', () => {
+      appState.currentTopic = 'Hiring Remote Sales';
+      elements.topicChips.forEach((c) => {
+        c.classList.toggle('active', c.dataset.topic === 'Hiring Remote Sales');
+      });
+      handleGenerateAiPost();
+    });
+  }
+
   // Live Text Editor Synchronizer
   elements.postEditor.addEventListener('input', () => {
     const text = elements.postEditor.value;
