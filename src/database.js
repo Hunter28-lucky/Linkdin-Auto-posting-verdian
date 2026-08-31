@@ -22,6 +22,9 @@ const DEFAULT_DB = {
     topics: ['AI & Tech Trends', 'Software Engineering Tips', 'Career & Productivity Growth', 'Future of Work'],
     defaultTone: 'engaging',
     geminiApiKey: process.env.GEMINI_API_KEY || '',
+    targetType: 'organization', // 'organization' | 'person'
+    organizationUrn: '', // e.g. 'urn:li:organization:12345678'
+    organizationName: 'Verdian',
   },
   queue: [],
   history: [],

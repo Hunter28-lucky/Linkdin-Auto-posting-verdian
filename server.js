@@ -12,8 +12,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 // Async state loader middleware for serverless / Vercel KV persistence
 app.use(async (req, res, next) => {
@@ -35,7 +35,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Initiate LinkedIn OAuth Flow
 app.get('/auth/linkedin', (req, res) => {
   try {
-    // Determine dynamic host redirect if behind proxy/Vercel
     const host = req.headers['x-forwarded-host'] || req.headers.host;
     const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
     const dynamicRedirectUri = host && !host.includes('localhost')
@@ -94,37 +93,17 @@ app.post('/api/auth/disconnect', (req, res) => {
   res.json({ success: true, message: 'LinkedIn account disconnected.' });
 });
 
-// Manual Access Token Setup
-app.post('/api/auth/manual-token', async (req, res) => {
-  const { accessToken, personUrn, name } = req.body;
-  if (!accessToken) {
-    return res.status(400).json({ error: 'Access token is required' });
-  }
-
+// Get user's managed organizations / company pages
+app.get('/api/linkedin/organizations', async (req, res) => {
   try {
-    let profile = null;
-    try {
-      profile = await linkedin.getProfileInfo(accessToken);
-    } catch {
-      profile = {
-        id: personUrn ? personUrn.replace('urn:li:person:', '') : 'manual_user',
-        urn: personUrn || 'urn:li:person:manual',
-        name: name || 'LinkedIn User',
-        email: '',
-        picture: null,
-      };
+    const tokens = db.getTokens();
+    if (!tokens.accessToken) {
+      return res.json({ success: false, organizations: [] });
     }
-
-    db.saveTokens({
-      accessToken,
-      refreshToken: null,
-      expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
-      profile,
-    });
-
-    res.json({ success: true, profile });
+    const orgs = await linkedin.getUserOrganizations(tokens.accessToken);
+    res.json({ success: true, organizations: orgs });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -149,33 +128,47 @@ app.post('/api/posts/generate', async (req, res) => {
   try {
     const { topic, tone, customPrompt } = req.body;
     const generated = await aiGenerator.generatePost({ topic, tone, customPrompt });
-    res.json({ success: true, ...generated });
+    const imageConcept = aiGenerator.generateImageConcept(topic, generated.content);
+
+    res.json({
+      success: true,
+      ...generated,
+      imageUrl: imageConcept,
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 app.post('/api/posts/publish-now', async (req, res) => {
-  const { content, topic } = req.body;
+  const { content, topic, imageUrl, imageData, targetType, organizationUrn } = req.body;
   if (!content || !content.trim()) {
     return res.status(400).json({ error: 'Post content cannot be empty.' });
   }
 
   try {
     console.log('[API] Publishing post to LinkedIn...');
-    const result = await linkedin.publishPost(content.trim());
+    const result = await linkedin.publishPost(content.trim(), {
+      imageUrl,
+      imageData,
+      targetType,
+      organizationUrn,
+    });
 
     const record = db.addToHistory({
       content: content.trim(),
       topic: topic || 'Manual Publish',
       status: 'success',
       linkedinPostUrn: result.postUrn,
+      authorUrn: result.authorUrn,
+      imageUrl: imageUrl || (imageData ? 'Attached Image' : null),
     });
 
     res.json({
       success: true,
       message: 'Post published successfully to LinkedIn!',
       postUrn: result.postUrn,
+      authorUrn: result.authorUrn,
       historyItem: record,
     });
   } catch (err) {
@@ -204,11 +197,11 @@ app.get('/api/queue', (req, res) => {
 });
 
 app.post('/api/queue', (req, res) => {
-  const { content, topic, tone, scheduledFor } = req.body;
+  const { content, topic, tone, imageUrl, scheduledFor } = req.body;
   if (!content || !content.trim()) {
     return res.status(400).json({ error: 'Content is required.' });
   }
-  const post = db.addToQueue({ content: content.trim(), topic, tone, scheduledFor });
+  const post = db.addToQueue({ content: content.trim(), topic, tone, imageUrl, scheduledFor });
   res.json({ success: true, post });
 });
 
@@ -235,9 +228,7 @@ app.get('/api/history', (req, res) => {
 // 5. VERCEL CRON & SETTINGS APIS
 // ==========================================
 
-// Vercel Cron Endpoint: Triggered automatically by Vercel according to vercel.json schedule
 app.all(['/api/cron/daily-post', '/api/scheduler/trigger-now'], async (req, res) => {
-  // Check optional Vercel Cron Secret if set
   if (process.env.CRON_SECRET) {
     const authHeader = req.headers['authorization'];
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -287,5 +278,4 @@ if (!process.env.VERCEL) {
   });
 }
 
-// Export for Vercel Serverless Functions
 module.exports = app;

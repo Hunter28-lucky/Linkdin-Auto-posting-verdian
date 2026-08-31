@@ -251,7 +251,22 @@ function generateDynamicTemplate(topic, tone, customPrompt) {
   };
 }
 
+/**
+ * Generate matching visual / image concept for a post
+ */
+function generateImageConcept(topic, postText) {
+  const visualIdeas = {
+    'AI & Tech Trends': 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=1000&auto=format&fit=crop&q=80',
+    'Software Engineering Tips': 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1000&auto=format&fit=crop&q=80',
+    'Career & Productivity Growth': 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1000&auto=format&fit=crop&q=80',
+    'Future of Work': 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=1000&auto=format&fit=crop&q=80',
+  };
+
+  return visualIdeas[topic] || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1000&auto=format&fit=crop&q=80';
+}
+
 module.exports = {
   generatePost,
+  generateImageConcept,
   TEMPLATES_BY_TOPIC,
 };

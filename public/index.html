@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PostPulse — Automated LinkedIn Daily Poster</title>
+  <title>PostPulse — Automated LinkedIn Poster (Verdian)</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -21,7 +21,7 @@
         </div>
         <div class="brand-text">
           <span class="brand-name">PostPulse</span>
-          <span class="brand-badge">AutoPilot</span>
+          <span class="brand-badge">Verdian AutoPilot</span>
         </div>
       </div>
     </div>
@@ -43,8 +43,17 @@
       </button>
     </nav>
 
-    <!-- Account Connection & Status -->
+    <!-- Account & Destination Badge -->
     <div class="nav-right">
+      <!-- Target Posting Destination Badge -->
+      <div class="target-badge" id="nav-target-badge" title="Target page for automatic and manual posts">
+        <span class="target-icon" id="nav-target-icon">🏢</span>
+        <div class="target-meta">
+          <span class="target-small">Target Page</span>
+          <span class="target-name" id="nav-target-name">Verdian (Company Page)</span>
+        </div>
+      </div>
+
       <div id="connection-status-pill" class="status-pill disconnected">
         <span class="ping-dot"></span>
         <span id="connection-label">Disconnected</span>
@@ -75,8 +84,8 @@
     <section id="auth-alert-banner" class="alert-banner warning">
       <div class="alert-icon">⚡</div>
       <div class="alert-content">
-        <h4>Connect your LinkedIn account to enable automated posting</h4>
-        <p>Ensure your developer app has <code>http://localhost:3000/auth/callback</code> in Redirect URLs and access to <strong>Share on LinkedIn</strong> product.</p>
+        <h4>Connect your LinkedIn account to enable automated posting for Verdian</h4>
+        <p>Ensure your developer app has <code>https://linkdinautopostingverdian.vercel.app/auth/callback</code> in Redirect URLs and access to <strong>Share on LinkedIn</strong>.</p>
       </div>
       <div class="alert-actions">
         <a href="/auth/linkedin" class="btn btn-warning btn-sm">Connect Now</a>
@@ -112,13 +121,13 @@
       <div class="metric-card toggle-card">
         <div class="metric-body">
           <div class="flex-between">
-            <span class="metric-label">Daily Auto-Pilot</span>
+            <span class="metric-label">Verdian Auto-Pilot</span>
             <label class="switch">
               <input type="checkbox" id="toggle-scheduler-active" checked>
               <span class="slider round"></span>
             </label>
           </div>
-          <span class="metric-sublabel" id="scheduler-status-text">Active (Auto-Generates & Posts)</span>
+          <span class="metric-sublabel" id="scheduler-status-text">Active (Auto-Generates & Posts Daily)</span>
         </div>
       </div>
     </section>
@@ -133,7 +142,22 @@
         <div class="studio-panel composer-panel">
           <div class="panel-header">
             <h3><span class="gradient-text">AI Post Studio</span></h3>
-            <span class="engine-badge" id="current-engine-badge">⚡ Smart Dynamic Engine</span>
+            <span class="engine-badge" id="current-engine-badge">⚡ Gemini / Smart Engine</span>
+          </div>
+
+          <!-- Target Entity Selector -->
+          <div class="form-group target-selector-group">
+            <label class="form-label">Post Destination</label>
+            <div class="target-options">
+              <label class="target-option-btn active" id="opt-target-org">
+                <input type="radio" name="studioTarget" value="organization" checked>
+                <span>🏢 Verdian (Company Page)</span>
+              </label>
+              <label class="target-option-btn" id="opt-target-person">
+                <input type="radio" name="studioTarget" value="person">
+                <span>👤 Personal Profile</span>
+              </label>
+            </div>
           </div>
 
           <!-- Quick Topic Selector -->
@@ -152,7 +176,7 @@
             <label class="form-label" for="input-custom-prompt">
               Custom Direction / Key Takeaway <span class="optional">(optional)</span>
             </label>
-            <input type="text" id="input-custom-prompt" class="form-control" placeholder="e.g. Discussing why small AI agents beat monolithic models...">
+            <input type="text" id="input-custom-prompt" class="form-control" placeholder="e.g. Announcing new AI capabilities at Verdian...">
           </div>
 
           <!-- Tone Selector -->
@@ -169,7 +193,7 @@
 
           <!-- Generate Button -->
           <button id="btn-generate-ai" class="btn btn-gradient btn-block btn-lg">
-            <span class="btn-icon">✨</span> Generate Post with AI
+            <span class="btn-icon">✨</span> Generate Post & Visual with AI
           </button>
 
           <hr class="divider">
@@ -177,13 +201,27 @@
           <!-- Post Content Editor -->
           <div class="form-group">
             <div class="flex-between mb-2">
-              <label class="form-label" for="post-editor">Post Content</label>
+              <label class="form-label" for="post-editor">Post Text</label>
               <div class="editor-tools">
                 <span id="char-counter" class="char-count">0 characters</span>
                 <button id="btn-copy-post" class="btn-text btn-xs" title="Copy to clipboard">📋 Copy</button>
               </div>
             </div>
-            <textarea id="post-editor" class="form-control textarea-editor" rows="11" placeholder="Write or generate your LinkedIn post here..."></textarea>
+            <textarea id="post-editor" class="form-control textarea-editor" rows="9" placeholder="Write or generate your LinkedIn post here..."></textarea>
+          </div>
+
+          <!-- Image Attachment Section -->
+          <div class="form-group image-attach-section">
+            <label class="form-label">Attached Visual / Graphic <span class="optional">(Optional)</span></label>
+            <div class="image-action-bar">
+              <label class="btn btn-outline btn-sm file-upload-btn">
+                📁 Upload Image
+                <input type="file" id="input-file-image" accept="image/*" style="display:none;">
+              </label>
+              <button type="button" id="btn-gen-ai-image" class="btn btn-outline btn-sm">🎨 AI Visual Idea</button>
+              <button type="button" id="btn-remove-image" class="btn btn-outline btn-sm text-danger hidden">✕ Remove</button>
+            </div>
+            <input type="url" id="input-image-url" class="form-control mt-2" placeholder="Or paste Image URL (e.g. https://...)" style="font-size: 0.82rem;">
           </div>
 
           <!-- Action Buttons -->
@@ -203,19 +241,19 @@
         <div class="studio-panel preview-panel">
           <div class="panel-header">
             <h3>Feed Preview</h3>
-            <span class="preview-tag">Live LinkedIn Mockup</span>
+            <span class="preview-tag" id="preview-target-tag">Live LinkedIn Mockup</span>
           </div>
 
           <div class="linkedin-card-preview">
             <!-- LinkedIn Header -->
             <div class="li-header">
-              <img id="preview-avatar" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" alt="Avatar" class="li-avatar" />
+              <img id="preview-avatar" src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=80" alt="Avatar" class="li-avatar" />
               <div class="li-author-meta">
                 <div class="li-name-row">
-                  <span id="preview-name" class="li-name">Your Name</span>
-                  <span class="li-degree">• 1st</span>
+                  <span id="preview-name" class="li-name">Verdian</span>
+                  <span class="li-degree" id="preview-degree">• Company</span>
                 </div>
-                <span class="li-headline">Building Autonomous Automation & AI Systems 🚀</span>
+                <span class="li-headline" id="preview-headline">AI-Powered Autonomous Systems & Automation 🚀</span>
                 <span class="li-timestamp">Just now • 🌐</span>
               </div>
               <div class="li-more-dots">•••</div>
@@ -225,7 +263,12 @@
             <div class="li-content" id="preview-content">
               AI isn't going to replace developers, but developers using AI are replacing those who don't.
               <br><br>
-              Click "Generate Post with AI" on the left to create engaging posts ready for LinkedIn!
+              Click "Generate Post & Visual with AI" on the left to craft posts tailored for Verdian!
+            </div>
+
+            <!-- Attached Image Preview inside LinkedIn Card -->
+            <div id="preview-image-container" class="li-image-preview hidden">
+              <img id="preview-post-image" src="" alt="Post Visual" class="li-attached-img" />
             </div>
 
             <!-- LinkedIn Social Stats -->
@@ -234,9 +277,9 @@
                 <span class="reaction-icon">👍</span>
                 <span class="reaction-icon">❤️</span>
                 <span class="reaction-icon">💡</span>
-                <span class="reaction-count">148</span>
+                <span class="reaction-count">194</span>
               </div>
-              <div class="li-comment-count">24 comments • 9 reposts</div>
+              <div class="li-comment-count">38 comments • 14 reposts</div>
             </div>
 
             <!-- LinkedIn Actions Bar -->
@@ -251,8 +294,8 @@
           <!-- Quick Test Automated Flow -->
           <div class="quick-test-box">
             <div class="quick-test-info">
-              <h5>⚡ Instant Daily Cron Test</h5>
-              <p>Trigger the automated daily schedule job right now without waiting for the scheduled time.</p>
+              <h5>⚡ Instant Daily Auto-Post Test</h5>
+              <p>Trigger the scheduled daily post right now to verify publication.</p>
             </div>
             <button id="btn-trigger-cron-now" class="btn btn-outline btn-sm">Trigger Job Now</button>
           </div>
@@ -272,19 +315,13 @@
           <div class="panel-header">
             <div>
               <h3>Scheduled Posts Queue</h3>
-              <p class="panel-subtitle">Posts waiting to be published automatically at your configured times.</p>
+              <p class="panel-subtitle">Posts waiting to be published automatically to Verdian at your configured times.</p>
             </div>
             <button id="btn-open-compose-modal" class="btn btn-primary btn-sm">+ Add Post to Queue</button>
           </div>
 
           <div id="queue-container" class="queue-list">
             <!-- Rendered dynamically -->
-            <div class="empty-state">
-              <div class="empty-icon">📭</div>
-              <h4>No posts in queue</h4>
-              <p>Your queue is currently empty. In <strong>Auto-Pilot mode</strong>, the system will automatically generate a fresh AI post each morning!</p>
-              <button class="btn btn-outline btn-sm mt-3" onclick="document.getElementById('tab-studio').click()">Go to AI Studio</button>
-            </div>
           </div>
         </div>
 
@@ -292,13 +329,13 @@
         <div class="schedule-side-panel">
           <div class="card">
             <h4>⏰ Daily Schedule Config</h4>
-            <p class="card-subtitle">Set when and how often your posts go live.</p>
+            <p class="card-subtitle">Set when and how often Verdian posts go live.</p>
 
             <form id="form-schedule-settings" class="mt-3">
               <div class="form-group">
                 <label class="form-label" for="input-schedule-time">Daily Posting Time</label>
                 <input type="time" id="input-schedule-time" class="form-control" value="09:00">
-                <small class="form-hint">Posts are published at this local time.</small>
+                <small class="form-hint">Posts are published at this time.</small>
               </div>
 
               <div class="form-group">
@@ -321,7 +358,7 @@
                     <input type="radio" name="autopilotMode" value="autopilot" checked>
                     <div class="radio-card-body">
                       <strong>Full Auto-Pilot (Recommended)</strong>
-                      <span>Publishes from queue if available; otherwise auto-generates a fresh AI post.</span>
+                      <span>Publishes from queue if available; otherwise auto-generates a fresh post for Verdian.</span>
                     </div>
                   </label>
                   <label class="radio-card">
@@ -365,10 +402,37 @@
     <section id="view-settings" class="tab-view">
       <div class="settings-grid">
         
-        <!-- General Settings -->
+        <!-- Company Page / Destination Settings -->
         <div class="card">
-          <h4>🤖 AI Generator Settings</h4>
-          <p class="card-subtitle">Configure your Google Gemini API key or customize topic categories.</p>
+          <h4>🏢 Target Page Settings</h4>
+          <p class="card-subtitle">Select whether to post to the Verdian Company Page or Personal Profile.</p>
+
+          <form id="form-target-settings" class="mt-3">
+            <div class="form-group">
+              <label class="form-label">Default Posting Target</label>
+              <select id="select-target-type" class="form-control select-control">
+                <option value="organization">🏢 Company Page (Verdian)</option>
+                <option value="person">👤 Personal Profile</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="group-org-config">
+              <label class="form-label" for="input-org-name">Company Page Name</label>
+              <input type="text" id="input-org-name" class="form-control" value="Verdian" placeholder="e.g. Verdian">
+              
+              <label class="form-label mt-2" for="input-org-urn">Organization ID / URN <span class="optional">(Optional if auto-detected)</span></label>
+              <input type="text" id="input-org-urn" class="form-control" placeholder="e.g. urn:li:organization:12345678 or 12345678">
+              <small class="form-hint">Find your page ID in your LinkedIn company page admin URL (e.g. linkedin.com/company/<strong>12345678</strong>/admin).</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save Target Settings</button>
+          </form>
+        </div>
+
+        <!-- AI Generator Settings -->
+        <div class="card">
+          <h4>🤖 AI Generator & Topics</h4>
+          <p class="card-subtitle">Configure Google Gemini API key and custom topic categories.</p>
 
           <form id="form-ai-settings" class="mt-3">
             <div class="form-group">
@@ -391,37 +455,6 @@
           </form>
         </div>
 
-        <!-- LinkedIn Developer App Guide -->
-        <div class="card">
-          <h4>🔗 LinkedIn Developer Portal Setup</h4>
-          <p class="card-subtitle">Your app credentials configured in <code>.env</code></p>
-
-          <div class="credentials-box mt-3">
-            <div class="cred-row">
-              <span class="cred-label">Client ID:</span>
-              <code class="cred-value" id="disp-client-id">77yhoqzulb69y2</code>
-            </div>
-            <div class="cred-row">
-              <span class="cred-label">Client Secret:</span>
-              <code class="cred-value">••••••••••••••••••••</code>
-            </div>
-            <div class="cred-row">
-              <span class="cred-label">Redirect URI:</span>
-              <code class="cred-value" id="disp-redirect-uri">http://localhost:3000/auth/callback</code>
-            </div>
-          </div>
-
-          <div class="guide-steps mt-3">
-            <h5>Quick Checklist in LinkedIn Portal:</h5>
-            <ol>
-              <li>Go to <a href="https://www.linkedin.com/developers/apps/264409202/auth" target="_blank" rel="noopener">LinkedIn Developer Auth Settings</a>.</li>
-              <li>Under <strong>Authorized redirect URLs for your app</strong>, add: <code>http://localhost:3000/auth/callback</code>.</li>
-              <li>Under <strong>Products</strong> tab, ensure <strong>Share on LinkedIn</strong> and <strong>Sign In with LinkedIn using OpenID Connect</strong> are added.</li>
-              <li>Click the top-right <strong>"Connect LinkedIn"</strong> button to authenticate!</li>
-            </ol>
-          </div>
-        </div>
-
       </div>
     </section>
 
@@ -441,7 +474,11 @@
         </div>
         <div class="form-group">
           <label class="form-label" for="modal-post-content">Post Content</label>
-          <textarea id="modal-post-content" class="form-control textarea-editor" rows="9"></textarea>
+          <textarea id="modal-post-content" class="form-control textarea-editor" rows="7"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="modal-post-image">Image URL (Optional)</label>
+          <input type="url" id="modal-post-image" class="form-control" placeholder="https://...">
         </div>
       </div>
       <div class="modal-footer">

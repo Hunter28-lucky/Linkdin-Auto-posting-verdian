@@ -1,4 +1,5 @@
 const https = require('https');
+const http = require('http');
 const querystring = require('querystring');
 const db = require('./database');
 
@@ -12,10 +13,20 @@ function getAuthConfig(customRedirectUri) {
 
 /**
  * Generate LinkedIn OAuth 2.0 Authorization URL
+ * Requests permissions for both personal profile & organization pages
  */
 function getAuthorizationUrl(state = 'linkedin_auto_auth_' + Date.now(), customRedirectUri) {
   const { clientId, redirectUri } = getAuthConfig(customRedirectUri);
-  const scopes = ['openid', 'profile', 'email', 'w_member_social'].join(' ');
+  const scopes = [
+    'openid',
+    'profile',
+    'email',
+    'w_member_social',
+    'w_organization_social',
+    'r_organization_social',
+    'rw_organization_admin',
+  ].join(' ');
+
   const params = querystring.stringify({
     response_type: 'code',
     client_id: clientId,
@@ -35,7 +46,7 @@ function exchangeCodeForToken(code, req) {
     if (req) {
       const host = req.headers['x-forwarded-host'] || req.headers.host;
       const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
-      if (host && !host.includes('localhost') && !process.env.LINKEDIN_REDIRECT_URI) {
+      if (host && !host.includes('localhost')) {
         customRedirectUri = `${protocol}://${host}/auth/callback`;
       }
     }
@@ -173,26 +184,216 @@ function getLegacyProfile(accessToken) {
 }
 
 /**
- * Publish Post via LinkedIn REST API (or UGC fallback)
+ * Fetch list of organization/company pages user manages
  */
-async function publishPost(content) {
+function getUserOrganizations(accessToken) {
+  return new Promise((resolve) => {
+    const options = {
+      hostname: 'api.linkedin.com',
+      port: 443,
+      path: '/v2/organizationalEntityAcls?q=roleAssignee',
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'X-Restli-Protocol-Version': '2.0.0',
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.elements && parsed.elements.length > 0) {
+            const orgs = parsed.elements.map((el) => {
+              const urn = el.organizationalTarget;
+              const orgId = urn ? urn.split(':').pop() : '';
+              return {
+                urn: urn,
+                id: orgId,
+                role: el.role,
+                name: `Organization (${orgId})`,
+              };
+            });
+            resolve(orgs);
+          } else {
+            resolve([]);
+          }
+        } catch {
+          resolve([]);
+        }
+      });
+    });
+
+    req.on('error', () => resolve([]));
+    req.end();
+  });
+}
+
+/**
+ * Upload Image to LinkedIn REST API
+ */
+async function uploadImageToLinkedIn(accessToken, authorUrn, imageSource) {
+  try {
+    let imageBuffer = null;
+    let contentType = 'image/jpeg';
+
+    if (imageSource.startsWith('data:')) {
+      const match = imageSource.match(/^data:(image\/[a-zA-Z0-9\+\-]+);base64,(.+)$/);
+      if (match) {
+        contentType = match[1];
+        imageBuffer = Buffer.from(match[2], 'base64');
+      }
+    } else if (imageSource.startsWith('http://') || imageSource.startsWith('https://')) {
+      imageBuffer = await fetchImageBuffer(imageSource);
+    }
+
+    if (!imageBuffer) return null;
+
+    // Step 1: Initialize Image Upload
+    const initData = JSON.stringify({
+      initializeUploadRequest: {
+        owner: authorUrn,
+      },
+    });
+
+    const initOptions = {
+      hostname: 'api.linkedin.com',
+      port: 443,
+      path: '/rest/images?action=initializeUpload',
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'LinkedIn-Version': '202401',
+        'X-Restli-Protocol-Version': '2.0.0',
+        'Content-Length': Buffer.byteLength(initData),
+      },
+    };
+
+    const initRes = await makeHttpsRequest(initOptions, initData);
+    const uploadUrl = initRes.value?.uploadUrl;
+    const imageUrn = initRes.value?.image;
+
+    if (!uploadUrl || !imageUrn) {
+      console.warn('[LinkedIn Image] Could not get upload URL:', initRes);
+      return null;
+    }
+
+    // Step 2: PUT image binary to uploadUrl
+    await uploadBinary(uploadUrl, imageBuffer, contentType);
+    console.log('[LinkedIn Image] ✅ Image uploaded successfully. URN:', imageUrn);
+    return imageUrn;
+  } catch (err) {
+    console.warn('[LinkedIn Image] Image upload failed, will post text-only fallback:', err.message);
+    return null;
+  }
+}
+
+function fetchImageBuffer(url) {
+  return new Promise((resolve, reject) => {
+    const client = url.startsWith('https') ? https : http;
+    client.get(url, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('error', reject);
+    }).on('error', reject);
+  });
+}
+
+function uploadBinary(uploadUrl, buffer, contentType) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(uploadUrl);
+    const options = {
+      hostname: parsed.hostname,
+      port: 443,
+      path: parsed.pathname + parsed.search,
+      method: 'PUT',
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': buffer.length,
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        resolve();
+      } else {
+        reject(new Error(`Binary PUT failed HTTP ${res.statusCode}`));
+      }
+    });
+
+    req.on('error', reject);
+    req.write(buffer);
+    req.end();
+  });
+}
+
+function makeHttpsRequest(options, postData) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (c) => (data += c));
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch {
+          resolve(data);
+        }
+      });
+    });
+    req.on('error', reject);
+    if (postData) req.write(postData);
+    req.end();
+  });
+}
+
+/**
+ * Publish Post via LinkedIn REST API
+ * Supports both Organization and Personal Profile target URNs and optional Images
+ */
+async function publishPost(content, options = {}) {
   const tokens = db.getTokens();
+  const settings = db.getSettings();
+
   if (!tokens.accessToken) {
     throw new Error('LinkedIn account is not connected. Please connect your account first.');
   }
 
-  const personUrn = tokens.profile?.urn;
-  if (!personUrn) {
-    throw new Error('LinkedIn Person URN is missing. Please reconnect your account.');
+  // Determine Author URN: Organization Page vs Personal Profile
+  let authorUrn = tokens.profile?.urn;
+  const targetType = options.targetType || settings.targetType || 'organization';
+
+  if (targetType === 'organization') {
+    // If organization URN specified in settings, use it
+    if (settings.organizationUrn && settings.organizationUrn.trim()) {
+      authorUrn = settings.organizationUrn.trim();
+      if (!authorUrn.startsWith('urn:li:organization:')) {
+        authorUrn = `urn:li:organization:${authorUrn}`;
+      }
+    } else {
+      // Look up if user has organization in state
+      console.log(`[LinkedIn] Posting to default/configured Organization page...`);
+    }
   }
 
+  console.log(`[LinkedIn] Publishing post as author: ${authorUrn} (Target: ${targetType})`);
+
+  let imageUrn = null;
+  if (options.imageUrl || options.imageData) {
+    imageUrn = await uploadImageToLinkedIn(tokens.accessToken, authorUrn, options.imageUrl || options.imageData);
+  }
+
+  // Attempt REST API publish
   try {
-    const result = await publishViaRestApi(tokens.accessToken, personUrn, content);
+    const result = await publishViaRestApi(tokens.accessToken, authorUrn, content, imageUrn);
     return result;
   } catch (restErr) {
     console.warn('REST API post failed, attempting UGC Posts API fallback...', restErr.message);
     try {
-      const ugcResult = await publishViaUgcApi(tokens.accessToken, personUrn, content);
+      const ugcResult = await publishViaUgcApi(tokens.accessToken, authorUrn, content);
       return ugcResult;
     } catch (ugcErr) {
       throw new Error(`LinkedIn posting failed. REST API: ${restErr.message} | UGC API: ${ugcErr.message}`);
@@ -200,9 +401,9 @@ async function publishPost(content) {
   }
 }
 
-function publishViaRestApi(accessToken, authorUrn, text) {
+function publishViaRestApi(accessToken, authorUrn, text, imageUrn) {
   return new Promise((resolve, reject) => {
-    const postBody = JSON.stringify({
+    const postPayload = {
       author: authorUrn,
       commentary: text,
       visibility: 'PUBLIC',
@@ -213,7 +414,18 @@ function publishViaRestApi(accessToken, authorUrn, text) {
       },
       lifecycleState: 'PUBLISHED',
       isReshareDisabledByAuthor: false,
-    });
+    };
+
+    if (imageUrn) {
+      postPayload.content = {
+        media: {
+          id: imageUrn,
+          title: 'Post Image',
+        },
+      };
+    }
+
+    const postBody = JSON.stringify(postPayload);
 
     const options = {
       hostname: 'api.linkedin.com',
@@ -239,6 +451,7 @@ function publishViaRestApi(accessToken, authorUrn, text) {
             success: true,
             postUrn: postUrn || 'urn:li:post:created',
             api: 'REST',
+            authorUrn,
             publishedAt: new Date().toISOString(),
           });
         } else {
@@ -301,6 +514,7 @@ function publishViaUgcApi(accessToken, authorUrn, text) {
               success: true,
               postUrn: parsed.id || 'urn:li:ugcPost:created',
               api: 'UGC',
+              authorUrn,
               publishedAt: new Date().toISOString(),
             });
           } catch {
@@ -308,6 +522,7 @@ function publishViaUgcApi(accessToken, authorUrn, text) {
               success: true,
               postUrn: 'urn:li:ugcPost:created',
               api: 'UGC',
+              authorUrn,
               publishedAt: new Date().toISOString(),
             });
           }
@@ -334,5 +549,7 @@ module.exports = {
   getAuthorizationUrl,
   exchangeCodeForToken,
   getProfileInfo,
+  getUserOrganizations,
+  uploadImageToLinkedIn,
   publishPost,
 };
