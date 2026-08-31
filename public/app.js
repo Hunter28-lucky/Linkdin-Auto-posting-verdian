@@ -179,8 +179,35 @@ async function fetchStatus() {
 
     appState.status = data;
     renderStatus(data);
+
+    // Auto-detect and populate managed company page ID if connected
+    if (data.isConnected) {
+      loadUserOrganizations();
+    }
   } catch (err) {
     console.error('Failed to fetch status:', err);
+  }
+}
+
+async function loadUserOrganizations() {
+  try {
+    const res = await apiFetch('/api/linkedin/organizations');
+    const data = await res.json();
+    if (data.success && data.organizations && data.organizations.length > 0) {
+      appState.organizations = data.organizations;
+      const primary = data.organizations[0];
+      const quickInput = document.getElementById('input-quick-org-urn');
+      const settingsInput = document.getElementById('input-org-urn');
+
+      if (quickInput && !quickInput.value.trim()) {
+        quickInput.value = primary.id || primary.urn;
+        if (settingsInput) settingsInput.value = primary.id || primary.urn;
+        updateSettingsOnServer({ organizationUrn: primary.id || primary.urn });
+        showToast(`Auto-detected Company Page ID: ${primary.id || primary.urn} 🏢`, 'info');
+      }
+    }
+  } catch (err) {
+    console.warn('Could not auto-fetch organizations:', err);
   }
 }
 

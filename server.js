@@ -181,6 +181,20 @@ app.post('/api/auth/manual-token', async (req, res) => {
   }
 });
 
+// Fetch user's managed company pages
+app.get('/api/linkedin/organizations', async (req, res) => {
+  const tokens = db.getTokens();
+  if (!tokens.accessToken) {
+    return res.status(401).json({ error: 'LinkedIn not connected' });
+  }
+  try {
+    const orgs = await linkedin.getUserOrganizations(tokens.accessToken);
+    res.json({ success: true, organizations: orgs });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==========================================
 // 2. DASHBOARD & STATUS APIS
 // ==========================================

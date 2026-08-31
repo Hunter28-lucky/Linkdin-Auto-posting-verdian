@@ -152,53 +152,89 @@ function getProfileInfo(accessToken) {
 }
 
 /**
- * Resolve Organization Numeric URN from vanity name or input
+ * Fetch list of organization/company pages user manages
  */
-async function resolveOrganizationUrn(accessToken, rawInput) {
-  if (!rawInput) return '';
-  const input = String(rawInput).trim();
-
-  // If already purely numeric (e.g. 105829104 or urn:li:organization:105829104)
-  if (/^\d+$/.test(input)) return `urn:li:organization:${input}`;
-  if (input.startsWith('urn:li:organization:') && /^\d+$/.test(input.replace('urn:li:organization:', ''))) {
-    return input;
-  }
-
-  // Extract slug from URL if pasted (e.g. https://www.linkedin.com/company/veridian-digital-ai)
-  let slug = input;
-  const urlMatch = input.match(/\/company\/([0-9a-zA-Z\-_]+)/);
-  if (urlMatch) {
-    slug = urlMatch[1];
-  }
-  slug = slug.replace(/^urn:li:organization:/, '').trim();
-
-  if (/^\d+$/.test(slug)) return `urn:li:organization:${slug}`;
-
-  // Try to lookup numeric ID via LinkedIn API vanityName query
-  try {
-    const res = await makeHttpsRequest({
+function getUserOrganizations(accessToken) {
+  return new Promise((resolve) => {
+    const options = {
       hostname: 'api.linkedin.com',
       port: 443,
-      path: `/v2/organizations?q=vanityName&vanityName=${encodeURIComponent(slug)}`,
+      path: '/v2/organizationalEntityAcls?q=roleAssignee&state=APPROVED',
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'X-Restli-Protocol-Version': '2.0.0',
       },
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.elements && parsed.elements.length > 0) {
+            const orgs = parsed.elements.map((el) => {
+              const urn = el.organizationalTarget;
+              const orgId = urn ? urn.split(':').pop() : '';
+              return {
+                urn: urn,
+                id: orgId,
+                role: el.role,
+                name: `Organization (${orgId})`,
+              };
+            });
+            resolve(orgs);
+          } else {
+            resolve([]);
+          }
+        } catch {
+          resolve([]);
+        }
+      });
     });
 
-    if (res && res.elements && res.elements.length > 0) {
-      const orgId = res.elements[0].id;
-      if (orgId) {
-        console.log(`[LinkedIn] Successfully resolved company slug "${slug}" -> ID: ${orgId}`);
-        return `urn:li:organization:${orgId}`;
-      }
-    }
-  } catch (e) {
-    console.warn(`[LinkedIn] Vanity lookup note:`, e.message);
+    req.on('error', () => resolve([]));
+    req.end();
+  });
+}
+
+/**
+ * Resolve Organization Numeric URN from numeric ID, admin URL, or auto-detection
+ */
+async function resolveOrganizationUrn(accessToken, rawInput) {
+  const input = String(rawInput || '').trim();
+
+  // 1. Direct number check (e.g. 105829104 or urn:li:organization:105829104)
+  if (/^\d+$/.test(input)) return `urn:li:organization:${input}`;
+  if (input.startsWith('urn:li:organization:') && /^\d+$/.test(input.replace('urn:li:organization:', ''))) {
+    return input;
   }
 
-  return slug.startsWith('urn:li:') ? slug : `urn:li:organization:${slug}`;
+  // 2. Extract numeric ID from URL if present (e.g. linkedin.com/company/105829104/admin)
+  const numericUrlMatch = input.match(/\/company\/(\d+)/);
+  if (numericUrlMatch) {
+    return `urn:li:organization:${numericUrlMatch[1]}`;
+  }
+
+  // 3. Auto-detect from user's administered organizations via LinkedIn API
+  try {
+    const orgs = await getUserOrganizations(accessToken);
+    if (orgs && orgs.length > 0) {
+      const primaryOrg = orgs[0];
+      console.log(`[LinkedIn] Auto-detected administered organization: ${primaryOrg.urn}`);
+      return primaryOrg.urn;
+    }
+  } catch (e) {
+    console.warn('[LinkedIn] Auto-detect orgs notice:', e.message);
+  }
+
+  // 4. If non-numeric string (e.g. "veridian-digital-ai") and could not resolve, explain to user
+  if (!/^\d+$/.test(input.replace(/^urn:li:organization:/, ''))) {
+    throw new Error(`LinkedIn requires your NUMERIC Company Page ID. In your LinkedIn company admin URL (e.g., linkedin.com/company/105829104/admin), copy the number (e.g. 105829104) and paste it into the box.`);
+  }
+
+  return `urn:li:organization:${input.replace(/^urn:li:organization:/, '')}`;
 }
 
 /**
@@ -326,7 +362,7 @@ function makeHttpsRequest(options, postData) {
 }
 
 /**
- * Publish Post via LinkedIn REST API or UGC Posts API
+ * Publish Post via LinkedIn UGC Posts API or REST API
  */
 async function publishPost(content, options = {}) {
   const tokens = db.getTokens();
@@ -341,15 +377,11 @@ async function publishPost(content, options = {}) {
 
   if (targetType === 'organization') {
     const rawOrg = options.organizationUrn || settings.organizationUrn;
-    if (!rawOrg || !String(rawOrg).trim()) {
-      throw new Error('Verdian Company Page ID/URL is required. Please paste your Company Page ID or URL in the box above.');
-    }
-
     authorUrn = await resolveOrganizationUrn(tokens.accessToken, rawOrg);
-    console.log(`[LinkedIn] 🏢 Publishing to Company Page: ${authorUrn}`);
+    console.log(`[LinkedIn] 🏢 Target Author: ${authorUrn}`);
   } else {
     authorUrn = tokens.profile?.urn || 'urn:li:person:me';
-    console.log(`[LinkedIn] 👤 Publishing to Personal Profile: ${authorUrn}`);
+    console.log(`[LinkedIn] 👤 Target Author: ${authorUrn}`);
   }
 
   // Upload image if provided
@@ -359,7 +391,7 @@ async function publishPost(content, options = {}) {
     imageUrn = await uploadImageToLinkedIn(tokens.accessToken, authorUrn, imageToUpload);
   }
 
-  // Attempt 1: UGC Posts API (Stable, universal for both Organization and Person)
+  // Attempt UGC API
   try {
     const ugcResult = await publishViaUgcApi(tokens.accessToken, authorUrn, content, imageUrn);
     return ugcResult;
@@ -369,7 +401,7 @@ async function publishPost(content, options = {}) {
       const restResult = await publishViaRestApi(tokens.accessToken, authorUrn, content, imageUrn);
       return restResult;
     } catch (restErr) {
-      throw new Error(`LinkedIn posting failed for ${authorUrn}: ${ugcErr.message || restErr.message}`);
+      throw new Error(`LinkedIn publishing failed: ${ugcErr.message || restErr.message}`);
     }
   }
 }
@@ -537,6 +569,7 @@ module.exports = {
   getAuthorizationUrl,
   exchangeCodeForToken,
   getProfileInfo,
+  getUserOrganizations,
   resolveOrganizationUrn,
   uploadImageToLinkedIn,
   publishPost,
