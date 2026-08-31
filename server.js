@@ -254,9 +254,10 @@ app.post('/api/posts/publish-now', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Post published successfully to LinkedIn!',
+      message: result.fallbackNote || 'Post published successfully to LinkedIn!',
       postUrn: result.postUrn,
       authorUrn: result.authorUrn,
+      fallbackNote: result.fallbackNote || null,
       historyItem: record,
     });
   } catch (err) {

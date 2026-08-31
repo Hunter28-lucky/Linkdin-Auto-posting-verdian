@@ -755,7 +755,11 @@ async function handlePublishNow() {
 
     const data = await res.json();
     if (data.success) {
-      showToast(`🎉 Successfully posted to ${targetName}!`, 'success');
+      if (data.fallbackNote) {
+        showToast(`🎉 Post published to your Personal Profile! (Company page posting requires extra LinkedIn permissions)`, 'success');
+      } else {
+        showToast(`🎉 Successfully posted to ${targetName}!`, 'success');
+      }
       await refreshAll();
     } else {
       showToast(`Posting failed: ${data.error}`, 'error');

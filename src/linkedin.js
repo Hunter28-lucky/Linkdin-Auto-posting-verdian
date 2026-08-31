@@ -381,6 +381,7 @@ function makeHttpsRequest(options, postData) {
 
 /**
  * Publish Post via LinkedIn UGC Posts API or REST API
+ * Automatically falls back to personal profile if organization posting fails
  */
 async function publishPost(content, options = {}) {
   const tokens = db.getTokens();
@@ -391,6 +392,7 @@ async function publishPost(content, options = {}) {
   }
 
   const targetType = options.targetType || settings.targetType || 'organization';
+  const personUrn = tokens.profile?.urn || 'urn:li:person:me';
   let authorUrn = null;
 
   if (targetType === 'organization') {
@@ -398,7 +400,7 @@ async function publishPost(content, options = {}) {
     authorUrn = await resolveOrganizationUrn(tokens.accessToken, rawOrg);
     console.log(`[LinkedIn] 🏢 Target Author: ${authorUrn}`);
   } else {
-    authorUrn = tokens.profile?.urn || 'urn:li:person:me';
+    authorUrn = personUrn;
     console.log(`[LinkedIn] 👤 Target Author: ${authorUrn}`);
   }
 
@@ -409,17 +411,49 @@ async function publishPost(content, options = {}) {
     imageUrn = await uploadImageToLinkedIn(tokens.accessToken, authorUrn, imageToUpload);
   }
 
-  // Attempt UGC API
+  // Try publishing with the chosen author
+  const publishResult = await attemptPublish(tokens.accessToken, authorUrn, content, imageUrn);
+  if (publishResult) return publishResult;
+
+  // If we were targeting an organization and it failed, fall back to personal profile
+  if (targetType === 'organization' && authorUrn !== personUrn) {
+    console.warn(`[LinkedIn] ⚠️ Organization posting failed. Falling back to personal profile: ${personUrn}`);
+    console.warn('[LinkedIn] ℹ️ To post as a Company Page, add the "Community Management" product in your LinkedIn Developer App and request the w_organization_social scope.');
+
+    // Re-upload image under person's URN (LinkedIn requires image owner = post author)
+    let personalImageUrn = null;
+    if (imageToUpload) {
+      personalImageUrn = await uploadImageToLinkedIn(tokens.accessToken, personUrn, imageToUpload);
+    }
+
+    const fallbackResult = await attemptPublish(tokens.accessToken, personUrn, content, personalImageUrn);
+    if (fallbackResult) {
+      fallbackResult.fallbackNote = 'Posted to your personal profile because organization posting requires the w_organization_social permission. Go to LinkedIn Developer App → Products → Community Management to enable it.';
+      return fallbackResult;
+    }
+  }
+
+  throw new Error('LinkedIn publishing failed. Please check your LinkedIn connection and try again.');
+}
+
+/**
+ * Attempt to publish via UGC API, then REST API as fallback
+ */
+async function attemptPublish(accessToken, authorUrn, content, imageUrn) {
+  // Attempt UGC API first
   try {
-    const ugcResult = await publishViaUgcApi(tokens.accessToken, authorUrn, content, imageUrn);
+    const ugcResult = await publishViaUgcApi(accessToken, authorUrn, content, imageUrn);
     return ugcResult;
   } catch (ugcErr) {
-    console.warn('[LinkedIn] UGC API failed, trying REST API...', ugcErr.message);
+    console.warn('[LinkedIn] UGC API failed:', ugcErr.message);
+
+    // Attempt REST API as secondary
     try {
-      const restResult = await publishViaRestApi(tokens.accessToken, authorUrn, content, imageUrn);
+      const restResult = await publishViaRestApi(accessToken, authorUrn, content, imageUrn);
       return restResult;
     } catch (restErr) {
-      throw new Error(`LinkedIn publishing failed: ${ugcErr.message || restErr.message}`);
+      console.warn('[LinkedIn] REST API also failed:', restErr.message);
+      return null; // Signal that both APIs failed for this author
     }
   }
 }
