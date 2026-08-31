@@ -140,7 +140,11 @@ async function fetchHistory() {
 function renderStatus(status) {
   if (!status) return;
 
-  // Connection Pill & Header
+  // Update redirect URI in warning banner dynamically
+  const bannerCode = document.querySelector('#auth-alert-banner code');
+  if (bannerCode) {
+    bannerCode.textContent = `${window.location.origin}/auth/callback`;
+  }
   if (status.isConnected && status.profile) {
     elements.connPill.className = 'status-pill connected';
     elements.connLabel.textContent = 'Connected';
