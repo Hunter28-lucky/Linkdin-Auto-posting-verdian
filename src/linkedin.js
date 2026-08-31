@@ -93,7 +93,7 @@ function exchangeCodeForToken(code, req) {
  * Fetch Profile info using LinkedIn UserInfo endpoint
  */
 function getProfileInfo(accessToken) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const options = {
       hostname: 'api.linkedin.com',
       port: 443,
@@ -112,24 +112,21 @@ function getProfileInfo(accessToken) {
         try {
           const parsed = JSON.parse(data);
           if (res.statusCode >= 200 && res.statusCode < 300 && parsed.sub) {
-            const profile = {
+            resolve({
               id: parsed.sub,
               urn: `urn:li:person:${parsed.sub}`,
               name: parsed.name || `${parsed.given_name || ''} ${parsed.family_name || ''}`.trim() || 'LinkedIn User',
               email: parsed.email || '',
               picture: parsed.picture || null,
-            };
-            resolve(profile);
+            });
           } else {
-            getLegacyProfile(accessToken)
-              .then(resolve)
-              .catch(() => resolve({
-                id: 'me',
-                urn: 'urn:li:person:me',
-                name: 'LinkedIn User',
-                email: '',
-                picture: null,
-              }));
+            resolve({
+              id: 'me',
+              urn: 'urn:li:person:me',
+              name: 'LinkedIn User',
+              email: '',
+              picture: null,
+            });
           }
         } catch (e) {
           resolve({
@@ -154,44 +151,54 @@ function getProfileInfo(accessToken) {
   });
 }
 
-function getLegacyProfile(accessToken) {
-  return new Promise((resolve, reject) => {
-    const options = {
+/**
+ * Resolve Organization Numeric URN from vanity name or input
+ */
+async function resolveOrganizationUrn(accessToken, rawInput) {
+  if (!rawInput) return '';
+  const input = String(rawInput).trim();
+
+  // If already purely numeric (e.g. 105829104 or urn:li:organization:105829104)
+  if (/^\d+$/.test(input)) return `urn:li:organization:${input}`;
+  if (input.startsWith('urn:li:organization:') && /^\d+$/.test(input.replace('urn:li:organization:', ''))) {
+    return input;
+  }
+
+  // Extract slug from URL if pasted (e.g. https://www.linkedin.com/company/veridian-digital-ai)
+  let slug = input;
+  const urlMatch = input.match(/\/company\/([0-9a-zA-Z\-_]+)/);
+  if (urlMatch) {
+    slug = urlMatch[1];
+  }
+  slug = slug.replace(/^urn:li:organization:/, '').trim();
+
+  if (/^\d+$/.test(slug)) return `urn:li:organization:${slug}`;
+
+  // Try to lookup numeric ID via LinkedIn API vanityName query
+  try {
+    const res = await makeHttpsRequest({
       hostname: 'api.linkedin.com',
       port: 443,
-      path: '/v2/me',
+      path: `/v2/organizations?q=vanityName&vanityName=${encodeURIComponent(slug)}`,
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
+        'X-Restli-Protocol-Version': '2.0.0',
       },
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => (data += chunk));
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.id) {
-            resolve({
-              id: parsed.id,
-              urn: `urn:li:person:${parsed.id}`,
-              name: `${parsed.localizedFirstName || ''} ${parsed.localizedLastName || ''}`.trim() || 'LinkedIn User',
-              email: '',
-              picture: null,
-            });
-          } else {
-            reject(new Error(parsed.message || 'Legacy profile failed'));
-          }
-        } catch (e) {
-          reject(e);
-        }
-      });
     });
 
-    req.on('error', (e) => reject(e));
-    req.end();
-  });
+    if (res && res.elements && res.elements.length > 0) {
+      const orgId = res.elements[0].id;
+      if (orgId) {
+        console.log(`[LinkedIn] Successfully resolved company slug "${slug}" -> ID: ${orgId}`);
+        return `urn:li:organization:${orgId}`;
+      }
+    }
+  } catch (e) {
+    console.warn(`[LinkedIn] Vanity lookup note:`, e.message);
+  }
+
+  return slug.startsWith('urn:li:') ? slug : `urn:li:organization:${slug}`;
 }
 
 /**
@@ -234,7 +241,7 @@ async function uploadImageToLinkedIn(accessToken, authorUrn, imageSource) {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
-        'LinkedIn-Version': '202401',
+        'LinkedIn-Version': '202501',
         'X-Restli-Protocol-Version': '2.0.0',
         'Content-Length': Buffer.byteLength(initData),
       },
@@ -245,7 +252,7 @@ async function uploadImageToLinkedIn(accessToken, authorUrn, imageSource) {
     const imageUrn = initRes.value?.image;
 
     if (!uploadUrl || !imageUrn) {
-      console.warn('[LinkedIn Image] Could not get upload URL:', initRes);
+      console.warn('[LinkedIn Image] Initialize image upload fallback:', initRes);
       return null;
     }
 
@@ -254,7 +261,7 @@ async function uploadImageToLinkedIn(accessToken, authorUrn, imageSource) {
     console.log('[LinkedIn Image] ✅ Image uploaded successfully. URN:', imageUrn);
     return imageUrn;
   } catch (err) {
-    console.warn('[LinkedIn Image] Image upload failed, fallback to text-only:', err.message);
+    console.warn('[LinkedIn Image] Image upload warning:', err.message);
     return null;
   }
 }
@@ -319,27 +326,7 @@ function makeHttpsRequest(options, postData) {
 }
 
 /**
- * Clean and format organization ID / URN
- */
-function resolveOrganizationUrn(rawInput) {
-  if (!rawInput) return '';
-  const input = String(rawInput).trim();
-  if (input.startsWith('urn:li:organization:')) return input;
-  if (/^\d+$/.test(input)) return `urn:li:organization:${input}`;
-  
-  // Parse from URL like https://www.linkedin.com/company/105829104/admin or /company/verdian
-  const urlMatch = input.match(/\/company\/([0-9a-zA-Z\-_]+)/);
-  if (urlMatch) {
-    const slugOrId = urlMatch[1];
-    return /^\d+$/.test(slugOrId) ? `urn:li:organization:${slugOrId}` : slugOrId;
-  }
-
-  return input.startsWith('urn:li:') ? input : `urn:li:organization:${input}`;
-}
-
-/**
- * Publish Post via LinkedIn REST API
- * STRICT: If target is organization, ONLY posts to organization. Never leaks to personal account.
+ * Publish Post via LinkedIn REST API or UGC Posts API
  */
 async function publishPost(content, options = {}) {
   const tokens = db.getTokens();
@@ -354,127 +341,66 @@ async function publishPost(content, options = {}) {
 
   if (targetType === 'organization') {
     const rawOrg = options.organizationUrn || settings.organizationUrn;
-    const resolvedOrg = resolveOrganizationUrn(rawOrg);
-
-    if (!resolvedOrg || resolvedOrg === 'urn:li:organization:') {
-      throw new Error('Verdian Company Page ID/URN is not configured. Please enter your Company Page ID or URL (e.g. 105829104 or https://linkedin.com/company/105829104) in Target Settings.');
+    if (!rawOrg || !String(rawOrg).trim()) {
+      throw new Error('Verdian Company Page ID/URL is required. Please paste your Company Page ID or URL in the box above.');
     }
 
-    authorUrn = resolvedOrg;
-    console.log(`[LinkedIn] 🏢 STRICT MODE: Publishing to Company Page (${authorUrn})`);
+    authorUrn = await resolveOrganizationUrn(tokens.accessToken, rawOrg);
+    console.log(`[LinkedIn] 🏢 Publishing to Company Page: ${authorUrn}`);
   } else {
-    authorUrn = tokens.profile?.urn;
-    if (!authorUrn) {
-      throw new Error('Personal LinkedIn profile ID was not found. Please reconnect your account.');
-    }
-    console.log(`[LinkedIn] 👤 Publishing to Personal Profile (${authorUrn})`);
+    authorUrn = tokens.profile?.urn || 'urn:li:person:me';
+    console.log(`[LinkedIn] 👤 Publishing to Personal Profile: ${authorUrn}`);
   }
 
-  // Upload image if present
+  // Upload image if provided
   let imageUrn = null;
   const imageToUpload = options.imageData || options.imageUrl || (options.attachPoster ? '/assets/veridian-hiring-poster.jpg' : null);
   if (imageToUpload) {
     imageUrn = await uploadImageToLinkedIn(tokens.accessToken, authorUrn, imageToUpload);
   }
 
-  // Attempt REST API publish
+  // Attempt 1: UGC Posts API (Stable, universal for both Organization and Person)
   try {
-    const result = await publishViaRestApi(tokens.accessToken, authorUrn, content, imageUrn);
-    return result;
-  } catch (restErr) {
-    console.warn('REST API post failed, attempting UGC Posts API fallback...', restErr.message);
+    const ugcResult = await publishViaUgcApi(tokens.accessToken, authorUrn, content, imageUrn);
+    return ugcResult;
+  } catch (ugcErr) {
+    console.warn('[LinkedIn] UGC API failed, trying REST API...', ugcErr.message);
     try {
-      const ugcResult = await publishViaUgcApi(tokens.accessToken, authorUrn, content);
-      return ugcResult;
-    } catch (ugcErr) {
-      throw new Error(`LinkedIn posting failed for ${authorUrn}: ${restErr.message}`);
+      const restResult = await publishViaRestApi(tokens.accessToken, authorUrn, content, imageUrn);
+      return restResult;
+    } catch (restErr) {
+      throw new Error(`LinkedIn posting failed for ${authorUrn}: ${ugcErr.message || restErr.message}`);
     }
   }
 }
 
-function publishViaRestApi(accessToken, authorUrn, text, imageUrn) {
+function publishViaUgcApi(accessToken, authorUrn, text, imageUrn) {
   return new Promise((resolve, reject) => {
-    const postPayload = {
-      author: authorUrn,
-      commentary: text,
-      visibility: 'PUBLIC',
-      distribution: {
-        feedDistribution: 'MAIN_FEED',
-        targetEntities: [],
-        thirdPartyDistributionChannels: [],
+    const shareContent = {
+      shareCommentary: {
+        text: text,
       },
-      lifecycleState: 'PUBLISHED',
-      isReshareDisabledByAuthor: false,
+      shareMediaCategory: 'NONE',
     };
 
     if (imageUrn) {
-      postPayload.content = {
-        media: {
-          id: imageUrn,
-          title: 'Veridian Post Visual',
+      shareContent.shareMediaCategory = 'IMAGE';
+      shareContent.media = [
+        {
+          status: 'READY',
+          media: imageUrn,
+          title: {
+            text: 'Veridian Post Visual',
+          },
         },
-      };
+      ];
     }
 
-    const postBody = JSON.stringify(postPayload);
-
-    const options = {
-      hostname: 'api.linkedin.com',
-      port: 443,
-      path: '/rest/posts',
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        'LinkedIn-Version': '202401',
-        'X-Restli-Protocol-Version': '2.0.0',
-        'Content-Length': Buffer.byteLength(postBody),
-      },
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => (data += chunk));
-      res.on('end', () => {
-        const postUrn = res.headers['x-restli-id'] || res.headers['x-linkedin-id'];
-        if (res.statusCode === 201 || (res.statusCode >= 200 && res.statusCode < 300)) {
-          resolve({
-            success: true,
-            postUrn: postUrn || 'urn:li:post:created',
-            api: 'REST',
-            authorUrn,
-            publishedAt: new Date().toISOString(),
-          });
-        } else {
-          try {
-            const parsed = JSON.parse(data);
-            const msg = parsed.message || parsed.description || `HTTP ${res.statusCode}: ${data}`;
-            reject(new Error(msg));
-          } catch (e) {
-            reject(new Error(`HTTP ${res.statusCode}: ${data}`));
-          }
-        }
-      });
-    });
-
-    req.on('error', (e) => reject(e));
-    req.write(postBody);
-    req.end();
-  });
-}
-
-function publishViaUgcApi(accessToken, authorUrn, text) {
-  return new Promise((resolve, reject) => {
     const postBody = JSON.stringify({
       author: authorUrn,
       lifecycleState: 'PUBLISHED',
       specificContent: {
-        'com.linkedin.ugc.ShareContent': {
-          shareCommentary: {
-            text: text,
-          },
-          shareMediaCategory: 'NONE',
-        },
+        'com.linkedin.ugc.ShareContent': shareContent,
       },
       visibility: {
         'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC',
@@ -517,6 +443,77 @@ function publishViaUgcApi(accessToken, authorUrn, text) {
               publishedAt: new Date().toISOString(),
             });
           }
+        } else {
+          try {
+            const parsed = JSON.parse(data);
+            const msg = parsed.message || parsed.description || `HTTP ${res.statusCode}: ${data}`;
+            reject(new Error(msg));
+          } catch (e) {
+            reject(new Error(`HTTP ${res.statusCode}: ${data}`));
+          }
+        }
+      });
+    });
+
+    req.on('error', (e) => reject(e));
+    req.write(postBody);
+    req.end();
+  });
+}
+
+function publishViaRestApi(accessToken, authorUrn, text, imageUrn) {
+  return new Promise((resolve, reject) => {
+    const postPayload = {
+      author: authorUrn,
+      commentary: text,
+      visibility: 'PUBLIC',
+      distribution: {
+        feedDistribution: 'MAIN_FEED',
+        targetEntities: [],
+        thirdPartyDistributionChannels: [],
+      },
+      lifecycleState: 'PUBLISHED',
+      isReshareDisabledByAuthor: false,
+    };
+
+    if (imageUrn) {
+      postPayload.content = {
+        media: {
+          id: imageUrn,
+          title: 'Veridian Post Visual',
+        },
+      };
+    }
+
+    const postBody = JSON.stringify(postPayload);
+
+    const options = {
+      hostname: 'api.linkedin.com',
+      port: 443,
+      path: '/rest/posts',
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'LinkedIn-Version': '202501',
+        'X-Restli-Protocol-Version': '2.0.0',
+        'Content-Length': Buffer.byteLength(postBody),
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => (data += chunk));
+      res.on('end', () => {
+        const postUrn = res.headers['x-restli-id'] || res.headers['x-linkedin-id'];
+        if (res.statusCode === 201 || (res.statusCode >= 200 && res.statusCode < 300)) {
+          resolve({
+            success: true,
+            postUrn: postUrn || 'urn:li:post:created',
+            api: 'REST',
+            authorUrn,
+            publishedAt: new Date().toISOString(),
+          });
         } else {
           try {
             const parsed = JSON.parse(data);
