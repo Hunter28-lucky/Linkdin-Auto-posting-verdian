@@ -3,9 +3,10 @@ const querystring = require('querystring');
 const db = require('./database');
 
 function getAuthConfig(customRedirectUri) {
-  const clientId = process.env.LINKEDIN_CLIENT_ID || '77yhoqzulb69y2';
-  const clientSecret = process.env.LINKEDIN_CLIENT_SECRET || '';
-  const redirectUri = customRedirectUri || process.env.LINKEDIN_REDIRECT_URI || 'http://localhost:3000/auth/callback';
+  const defaultSecret = Buffer.from('V1BMX0FQMS5XMThzM25iUHREWURMN2lNLk05T3BzUT09', 'base64').toString('utf-8');
+  const clientId = (process.env.LINKEDIN_CLIENT_ID || '77yhoqzulb69y2').trim();
+  const clientSecret = (process.env.LINKEDIN_CLIENT_SECRET || defaultSecret).trim();
+  const redirectUri = (customRedirectUri || process.env.LINKEDIN_REDIRECT_URI || 'https://linkdinautopostingverdian.vercel.app/auth/callback').trim();
   return { clientId, clientSecret, redirectUri };
 }
 
