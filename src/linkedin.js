@@ -13,19 +13,10 @@ function getAuthConfig(customRedirectUri) {
 
 /**
  * Generate LinkedIn OAuth 2.0 Authorization URL
- * Requests permissions for both personal profile & organization pages
  */
 function getAuthorizationUrl(state = 'linkedin_auto_auth_' + Date.now(), customRedirectUri) {
   const { clientId, redirectUri } = getAuthConfig(customRedirectUri);
-  const scopes = [
-    'openid',
-    'profile',
-    'email',
-    'w_member_social',
-    'w_organization_social',
-    'r_organization_social',
-    'rw_organization_admin',
-  ].join(' ');
+  const scopes = ['openid', 'profile', 'email', 'w_member_social'].join(' ');
 
   const params = querystring.stringify({
     response_type: 'code',
