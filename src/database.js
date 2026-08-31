@@ -22,7 +22,7 @@ const DEFAULT_DB = {
     defaultTone: 'engaging',
     geminiApiKey: process.env.GEMINI_API_KEY || '',
     targetType: 'organization',
-    organizationUrn: '',
+    organizationUrn: 'urn:li:organization:117254291',
     organizationName: 'Veridian',
   },
   queue: [],
