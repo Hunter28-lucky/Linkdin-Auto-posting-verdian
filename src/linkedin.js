@@ -18,7 +18,7 @@ function getAuthConfig(customRedirectUri) {
  */
 function getAuthorizationUrl(state = 'linkedin_auto_auth_' + Date.now(), customRedirectUri) {
   const { clientId, redirectUri } = getAuthConfig(customRedirectUri);
-  const scopes = ['openid', 'profile', 'email', 'w_member_social'].join(' ');
+  const scopes = ['openid', 'profile', 'email', 'w_member_social', 'w_organization_social'].join(' ');
 
   const params = querystring.stringify({
     response_type: 'code',
