@@ -15,13 +15,43 @@ app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
-// Async state loader middleware for serverless / Vercel KV persistence
+// Middleware to parse cookies and authorization headers for unbreakable auth
 app.use(async (req, res, next) => {
   try {
     await db.loadStateAsync();
-  } catch (e) {
-    // Continue with local cache
+  } catch (e) {}
+
+  // Check client Authorization header or cookie for token fallback
+  const authHeader = req.headers['authorization'] || req.headers['x-linkedin-token'];
+  const cookieHeader = req.headers['cookie'];
+
+  let clientToken = null;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    clientToken = authHeader.replace('Bearer ', '').trim();
+  } else if (authHeader) {
+    clientToken = authHeader.trim();
+  } else if (cookieHeader) {
+    const match = cookieHeader.match(/postpulse_token=([^;]+)/);
+    if (match) clientToken = decodeURIComponent(match[1]);
   }
+
+  if (clientToken && (!db.getTokens().accessToken || db.getTokens().accessToken !== clientToken)) {
+    const userUrn = req.headers['x-user-urn'] ? decodeURIComponent(req.headers['x-user-urn']) : 'urn:li:person:me';
+    const userName = req.headers['x-user-name'] ? decodeURIComponent(req.headers['x-user-name']) : 'Connected User';
+
+    db.saveTokens({
+      accessToken: clientToken,
+      expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+      profile: {
+        id: 'me',
+        urn: userUrn,
+        name: userName,
+        email: '',
+        picture: null,
+      },
+    });
+  }
+
   next();
 });
 
@@ -69,18 +99,41 @@ app.get('/auth/callback', async (req, res) => {
     const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
     console.log('[Auth] Fetching LinkedIn user profile...');
-    const profile = await linkedin.getProfileInfo(accessToken);
+    let profile = null;
+    try {
+      profile = await linkedin.getProfileInfo(accessToken);
+    } catch (profErr) {
+      console.warn('[Auth] Profile fetch fallback:', profErr.message);
+      profile = {
+        id: 'me',
+        urn: 'urn:li:person:me',
+        name: 'LinkedIn User',
+        email: '',
+        picture: null,
+      };
+    }
 
-    // Save tokens and user info to persistent storage
-    db.saveTokens({
+    // Await save to database / Upstash Redis
+    await db.saveTokensAsync({
       accessToken,
       refreshToken: tokenResponse.refresh_token || null,
       expiresAt,
       profile,
     });
 
-    console.log(`[Auth] ✅ Successfully connected LinkedIn account: ${profile.name} (${profile.urn})`);
-    res.redirect('/?connected=true');
+    console.log(`[Auth] ✅ Successfully saved LinkedIn account for: ${profile.name}`);
+
+    // Set cookie and pass URL parameters for unbreakable client-side caching
+    res.setHeader('Set-Cookie', `postpulse_token=${encodeURIComponent(accessToken)}; Path=/; Max-Age=5184000; SameSite=Lax`);
+    const params = new URLSearchParams({
+      connected: 'true',
+      token: accessToken,
+      name: profile.name || 'LinkedIn User',
+      urn: profile.urn || 'urn:li:person:me',
+      avatar: profile.picture || '',
+    });
+
+    res.redirect(`/?${params.toString()}`);
   } catch (err) {
     console.error('[Auth] ❌ Failed to complete LinkedIn OAuth:', err.message);
     res.redirect(`/?auth_error=${encodeURIComponent(err.message)}`);
@@ -88,22 +141,43 @@ app.get('/auth/callback', async (req, res) => {
 });
 
 // Disconnect LinkedIn Account
-app.post('/api/auth/disconnect', (req, res) => {
-  db.clearTokens();
+app.post('/api/auth/disconnect', async (req, res) => {
+  await db.clearTokensAsync();
+  res.setHeader('Set-Cookie', 'postpulse_token=; Path=/; Max-Age=0');
   res.json({ success: true, message: 'LinkedIn account disconnected.' });
 });
 
-// Get user's managed organizations / company pages
-app.get('/api/linkedin/organizations', async (req, res) => {
+// Manual Access Token Setup
+app.post('/api/auth/manual-token', async (req, res) => {
+  const { accessToken, personUrn, name } = req.body;
+  if (!accessToken) {
+    return res.status(400).json({ error: 'Access token is required' });
+  }
+
   try {
-    const tokens = db.getTokens();
-    if (!tokens.accessToken) {
-      return res.json({ success: false, organizations: [] });
+    let profile = null;
+    try {
+      profile = await linkedin.getProfileInfo(accessToken);
+    } catch {
+      profile = {
+        id: personUrn ? personUrn.replace('urn:li:person:', '') : 'me',
+        urn: personUrn || 'urn:li:person:me',
+        name: name || 'LinkedIn User',
+        email: '',
+        picture: null,
+      };
     }
-    const orgs = await linkedin.getUserOrganizations(tokens.accessToken);
-    res.json({ success: true, organizations: orgs });
+
+    await db.saveTokensAsync({
+      accessToken,
+      refreshToken: null,
+      expiresAt: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString(),
+      profile,
+    });
+
+    res.json({ success: true, profile });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -133,7 +207,7 @@ app.post('/api/posts/generate', async (req, res) => {
     res.json({
       success: true,
       ...generated,
-      imageUrl: imageConcept,
+      imageUrl: generated.imageUrl || imageConcept,
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -155,7 +229,7 @@ app.post('/api/posts/publish-now', async (req, res) => {
       organizationUrn,
     });
 
-    const record = db.addToHistory({
+    const record = await db.addToHistoryAsync({
       content: content.trim(),
       topic: topic || 'Manual Publish',
       status: 'success',
@@ -174,7 +248,7 @@ app.post('/api/posts/publish-now', async (req, res) => {
   } catch (err) {
     console.error('[API] ❌ Failed to publish post:', err.message);
 
-    db.addToHistory({
+    await db.addToHistoryAsync({
       content: content.trim(),
       topic: topic || 'Manual Publish',
       status: 'failed',
@@ -196,27 +270,27 @@ app.get('/api/queue', (req, res) => {
   res.json(db.getQueue());
 });
 
-app.post('/api/queue', (req, res) => {
+app.post('/api/queue', async (req, res) => {
   const { content, topic, tone, imageUrl, scheduledFor } = req.body;
   if (!content || !content.trim()) {
     return res.status(400).json({ error: 'Content is required.' });
   }
-  const post = db.addToQueue({ content: content.trim(), topic, tone, imageUrl, scheduledFor });
+  const post = await db.addToQueueAsync({ content: content.trim(), topic, tone, imageUrl, scheduledFor });
   res.json({ success: true, post });
 });
 
-app.put('/api/queue/:id', (req, res) => {
+app.put('/api/queue/:id', async (req, res) => {
   const { id } = req.params;
-  const updated = db.updateQueueItem(id, req.body);
+  const updated = await db.updateQueueItemAsync(id, req.body);
   if (!updated) {
     return res.status(404).json({ error: 'Queued post not found.' });
   }
   res.json({ success: true, post: updated });
 });
 
-app.delete('/api/queue/:id', (req, res) => {
+app.delete('/api/queue/:id', async (req, res) => {
   const { id } = req.params;
-  const removed = db.removeFromQueue(id);
+  const removed = await db.removeFromQueueAsync(id);
   res.json({ success: removed });
 });
 
@@ -252,9 +326,9 @@ app.get('/api/settings', (req, res) => {
   res.json(db.getSettings());
 });
 
-app.post('/api/settings', (req, res) => {
+app.post('/api/settings', async (req, res) => {
   try {
-    const updated = db.updateSettings(req.body);
+    const updated = await db.updateSettingsAsync(req.body);
     scheduler.reloadScheduler();
     res.json({ success: true, settings: updated });
   } catch (err) {

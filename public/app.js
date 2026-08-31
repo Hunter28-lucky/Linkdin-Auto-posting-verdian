@@ -6,11 +6,11 @@ let appState = {
   status: null,
   queue: [],
   history: [],
-  currentTopic: 'AI & Tech Trends',
+  currentTopic: 'Hiring Remote Sales',
   activeTab: 'studio',
   editingPostId: null,
   currentTarget: 'organization', // 'organization' | 'person'
-  currentImage: null, // URL or base64
+  currentImage: '/assets/veridian-hiring-poster.jpg',
   organizations: [],
 };
 
@@ -112,6 +112,28 @@ const elements = {
   toastContainer: document.getElementById('toast-container'),
 };
 
+/**
+ * Universal authenticated API fetch helper
+ */
+async function apiFetch(url, options = {}) {
+  const token = localStorage.getItem('postpulse_token');
+  const userUrn = localStorage.getItem('postpulse_urn');
+  const userName = localStorage.getItem('postpulse_name');
+
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+    if (userUrn) headers['x-user-urn'] = encodeURIComponent(userUrn);
+    if (userName) headers['x-user-name'] = encodeURIComponent(userName);
+  }
+
+  return fetch(url, { ...options, headers });
+}
+
 // ==========================================
 // 1. INITIALIZATION & DATA FETCHING
 // ==========================================
@@ -120,6 +142,9 @@ async function init() {
   bindEventListeners();
   checkUrlParams();
   await refreshAll();
+
+  // Initial poster preview setup
+  setImageAttachment('/assets/veridian-hiring-poster.jpg');
 }
 
 async function refreshAll() {
@@ -130,8 +155,28 @@ async function refreshAll() {
 
 async function fetchStatus() {
   try {
-    const res = await fetch('/api/status');
+    const res = await apiFetch('/api/status');
     const data = await res.json();
+
+    const localToken = localStorage.getItem('postpulse_token');
+    if (localToken && !data.isConnected) {
+      data.isConnected = true;
+      data.profile = {
+        name: localStorage.getItem('postpulse_name') || 'LinkedIn User',
+        urn: localStorage.getItem('postpulse_urn') || 'urn:li:person:me',
+        picture: localStorage.getItem('postpulse_avatar') || null,
+      };
+      // Resync in background
+      apiFetch('/api/auth/manual-token', {
+        method: 'POST',
+        body: JSON.stringify({
+          accessToken: localToken,
+          personUrn: data.profile.urn,
+          name: data.profile.name,
+        }),
+      }).catch(() => {});
+    }
+
     appState.status = data;
     renderStatus(data);
   } catch (err) {
@@ -141,7 +186,7 @@ async function fetchStatus() {
 
 async function fetchQueue() {
   try {
-    const res = await fetch('/api/queue');
+    const res = await apiFetch('/api/queue');
     const data = await res.json();
     appState.queue = data;
     renderQueue(data);
@@ -152,7 +197,7 @@ async function fetchQueue() {
 
 async function fetchHistory() {
   try {
-    const res = await fetch('/api/history');
+    const res = await apiFetch('/api/history');
     const data = await res.json();
     appState.history = data;
     renderHistory(data);
@@ -192,6 +237,8 @@ function renderStatus(status) {
     if (status.tokenExpiresAt) {
       const days = Math.max(0, Math.ceil((new Date(status.tokenExpiresAt) - new Date()) / (1000 * 60 * 60 * 24)));
       elements.tokenDaysLeft.textContent = `${days} days token active`;
+    } else {
+      elements.tokenDaysLeft.textContent = `Token active`;
     }
   } else {
     elements.connPill.className = 'status-pill disconnected';
@@ -273,7 +320,7 @@ function updateTargetUI(targetType, orgName = 'Verdian') {
     // Feed Preview as Company
     elements.previewName.textContent = orgName;
     elements.previewDegree.textContent = '• Company';
-    elements.previewHeadline.textContent = 'AI-Powered Autonomous Systems & Automation 🚀';
+    elements.previewHeadline.textContent = 'Growth. Digital. Done Right. 🚀';
     elements.previewAvatar.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=80';
     elements.previewTargetTag.textContent = `Posting as ${orgName}`;
   } else {
@@ -284,11 +331,11 @@ function updateTargetUI(targetType, orgName = 'Verdian') {
     document.querySelector('input[name="studioTarget"][value="person"]').checked = true;
 
     // Feed Preview as Person
-    const userName = appState.status?.profile?.name || 'Your Name';
+    const userName = appState.status?.profile?.name || localStorage.getItem('postpulse_name') || 'Your Name';
     elements.previewName.textContent = userName;
     elements.previewDegree.textContent = '• 1st';
     elements.previewHeadline.textContent = 'Building Autonomous Automation & AI Systems 🚀';
-    elements.previewAvatar.src = appState.status?.profile?.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=0a66c2&color=fff`;
+    elements.previewAvatar.src = appState.status?.profile?.picture || localStorage.getItem('postpulse_avatar') || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=0a66c2&color=fff`;
     elements.previewTargetTag.textContent = `Posting as Personal Profile`;
   }
 }
@@ -442,10 +489,10 @@ function bindEventListeners() {
 
   // AI Visual Idea Button
   elements.btnGenAiImage.addEventListener('click', () => {
-    const visualUrl = `https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1000&auto=format&fit=crop&q=80`;
+    const visualUrl = `/assets/veridian-hiring-poster.jpg`;
     elements.inputImageUrl.value = visualUrl;
     setImageAttachment(visualUrl);
-    showToast('AI visual concept attached! 🎨', 'success');
+    showToast('Veridian poster attached! 🎨', 'success');
   });
 
   // Remove Image Button
@@ -531,7 +578,12 @@ function bindEventListeners() {
   // Disconnect LinkedIn Button
   elements.btnDisconnect.addEventListener('click', async () => {
     if (confirm('Are you sure you want to disconnect your LinkedIn account?')) {
-      await fetch('/api/auth/disconnect', { method: 'POST' });
+      localStorage.removeItem('postpulse_token');
+      localStorage.removeItem('postpulse_urn');
+      localStorage.removeItem('postpulse_name');
+      localStorage.removeItem('postpulse_avatar');
+
+      await apiFetch('/api/auth/disconnect', { method: 'POST' });
       showToast('LinkedIn account disconnected.', 'success');
       await refreshAll();
     }
@@ -589,9 +641,8 @@ async function handleGenerateAiPost() {
   elements.btnGenerateAi.innerHTML = `<span class="btn-icon">⏳</span> Generating engaging post & visual...`;
 
   try {
-    const res = await fetch('/api/posts/generate', {
+    const res = await apiFetch('/api/posts/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         topic: appState.currentTopic,
         tone: elements.selectTone.value,
@@ -610,7 +661,7 @@ async function handleGenerateAiPost() {
         setImageAttachment(data.imageUrl);
       }
 
-      showToast('Post & visual concept generated! ✨', 'success');
+      showToast('Post & visual generated! ✨', 'success');
     } else {
       showToast(data.error || 'Failed to generate post', 'error');
     }
@@ -628,7 +679,8 @@ async function handlePublishNow() {
     return showToast('Please write or generate a post first!', 'error');
   }
 
-  if (!appState.status?.isConnected) {
+  const token = localStorage.getItem('postpulse_token') || appState.status?.profile;
+  if (!appState.status?.isConnected && !token) {
     return showToast('Please connect your LinkedIn account first (top right).', 'error');
   }
 
@@ -637,9 +689,8 @@ async function handlePublishNow() {
   elements.btnPublishNow.innerHTML = `⏳ Publishing to ${targetName}...`;
 
   try {
-    const res = await fetch('/api/posts/publish-now', {
+    const res = await apiFetch('/api/posts/publish-now', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         content,
         topic: appState.currentTopic,
@@ -675,9 +726,8 @@ async function handleAddToQueue() {
   }
 
   try {
-    const res = await fetch('/api/queue', {
+    const res = await apiFetch('/api/queue', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         content,
         topic: appState.currentTopic,
@@ -704,7 +754,7 @@ async function handleTriggerCronNow() {
   elements.btnTriggerCron.textContent = 'Running Job...';
 
   try {
-    const res = await fetch('/api/scheduler/trigger-now', { method: 'POST' });
+    const res = await apiFetch('/api/scheduler/trigger-now', { method: 'POST' });
     const data = await res.json();
 
     if (data.success) {
@@ -737,7 +787,7 @@ window.editQueuePost = function (id) {
 window.deleteQueuePost = async function (id) {
   if (!confirm('Are you sure you want to remove this post from queue?')) return;
   try {
-    await fetch(`/api/queue/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/queue/${id}`, { method: 'DELETE' });
     showToast('Post removed from queue', 'success');
     await fetchQueue();
     await fetchStatus();
@@ -751,9 +801,8 @@ window.publishQueuePostNow = async function (id) {
   if (!item) return;
 
   try {
-    const res = await fetch('/api/posts/publish-now', {
+    const res = await apiFetch('/api/posts/publish-now', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         content: item.content,
         topic: item.topic,
@@ -764,7 +813,7 @@ window.publishQueuePostNow = async function (id) {
 
     const data = await res.json();
     if (data.success) {
-      await fetch(`/api/queue/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/queue/${id}`, { method: 'DELETE' });
       showToast('Queued post published to LinkedIn! 🎉', 'success');
       await refreshAll();
     } else {
@@ -778,9 +827,9 @@ window.publishQueuePostNow = async function (id) {
 function openModalForCreate() {
   appState.editingPostId = null;
   elements.modalTitle.textContent = 'Add Post to Queue';
-  elements.modalPostTopic.value = 'General';
+  elements.modalPostTopic.value = 'Hiring Remote Sales';
   elements.modalPostContent.value = '';
-  elements.modalPostImage.value = '';
+  elements.modalPostImage.value = '/assets/veridian-hiring-poster.jpg';
   elements.modalEditor.classList.remove('hidden');
 }
 
@@ -800,16 +849,14 @@ async function handleSaveModalPost() {
 
   try {
     if (appState.editingPostId) {
-      await fetch(`/api/queue/${appState.editingPostId}`, {
+      await apiFetch(`/api/queue/${appState.editingPostId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic, content, imageUrl }),
       });
       showToast('Queued post updated! ✏️', 'success');
     } else {
-      await fetch('/api/queue', {
+      await apiFetch('/api/queue', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic, content, imageUrl }),
       });
       showToast('Post added to queue! 📋', 'success');
@@ -825,9 +872,8 @@ async function handleSaveModalPost() {
 
 async function updateSettingsOnServer(newSettings) {
   try {
-    const res = await fetch('/api/settings', {
+    const res = await apiFetch('/api/settings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newSettings),
     });
     return await res.json();
@@ -859,6 +905,18 @@ function showToast(message, type = 'info') {
 function checkUrlParams() {
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('connected') === 'true') {
+    const token = urlParams.get('token');
+    const name = urlParams.get('name');
+    const urn = urlParams.get('urn');
+    const avatar = urlParams.get('avatar');
+
+    if (token) {
+      localStorage.setItem('postpulse_token', token);
+      if (name) localStorage.setItem('postpulse_name', name);
+      if (urn) localStorage.setItem('postpulse_urn', urn);
+      if (avatar) localStorage.setItem('postpulse_avatar', avatar);
+    }
+
     showToast('LinkedIn account successfully connected! 🚀', 'success');
     window.history.replaceState({}, document.title, '/');
   } else if (urlParams.get('auth_error')) {

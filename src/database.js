@@ -2,7 +2,6 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-// For local development or temporary fallback on Vercel
 const isVercel = process.env.VERCEL === '1' || !!process.env.AWS_LAMBDA_FUNCTION_NAME;
 const DB_DIR = isVercel ? '/tmp' : path.join(__dirname, '..', 'data');
 const DB_FILE = path.join(DB_DIR, 'db.json');
@@ -19,26 +18,23 @@ const DEFAULT_DB = {
     scheduleTime: '09:00',
     scheduleDays: ['1', '2', '3', '4', '5'],
     autopilotMode: 'autopilot',
-    topics: ['AI & Tech Trends', 'Software Engineering Tips', 'Career & Productivity Growth', 'Future of Work'],
+    topics: ['Hiring Remote Sales', 'AI & Tech Trends', 'Software Engineering Tips', 'Career & Productivity Growth'],
     defaultTone: 'engaging',
     geminiApiKey: process.env.GEMINI_API_KEY || '',
-    targetType: 'organization', // 'organization' | 'person'
-    organizationUrn: '', // e.g. 'urn:li:organization:12345678'
-    organizationName: 'Verdian',
+    targetType: 'organization',
+    organizationUrn: '',
+    organizationName: 'Veridian',
   },
   queue: [],
   history: [],
 };
 
-// In-memory cache for ultra-fast reads during Lambda lifecycle
 let memoryCache = null;
 
 function getUpstashConfig() {
-  // Check direct standard names and custom prefix like STORAGE_REST_API_URL / STORAGE_URL
   let url = process.env.STORAGE_REST_API_URL || process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || process.env.STORAGE_URL;
   let token = process.env.STORAGE_REST_API_TOKEN || process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || process.env.STORAGE_TOKEN;
 
-  // Dynamic fallback search for any *_REST_API_URL in environment
   if (!url || !token) {
     for (const key in process.env) {
       if (key.endsWith('_REST_API_URL')) {
@@ -54,9 +50,9 @@ function getUpstashConfig() {
 }
 
 /**
- * Perform HTTPS request to Upstash / Vercel KV REST API
+ * Robust Upstash REST API caller
  */
-function callUpstash(method, pathName, bodyData = null) {
+function callUpstash(method, pathName, rawBody = null) {
   const config = getUpstashConfig();
   if (!config) return Promise.resolve(null);
 
@@ -70,9 +66,13 @@ function callUpstash(method, pathName, bodyData = null) {
         method: method,
         headers: {
           Authorization: `Bearer ${config.token}`,
-          'Content-Type': 'application/json',
+          'Content-Type': 'text/plain',
         },
       };
+
+      if (rawBody) {
+        options.headers['Content-Length'] = Buffer.byteLength(rawBody);
+      }
 
       const req = https.request(options, (res) => {
         let data = '';
@@ -82,15 +82,20 @@ function callUpstash(method, pathName, bodyData = null) {
             const parsed = JSON.parse(data);
             resolve(parsed.result !== undefined ? parsed.result : parsed);
           } catch {
-            resolve(null);
+            resolve(data);
           }
         });
       });
 
-      req.on('error', () => resolve(null));
-      if (bodyData) req.write(JSON.stringify(bodyData));
+      req.on('error', (e) => {
+        console.warn('[Upstash Error]', e.message);
+        resolve(null);
+      });
+
+      if (rawBody) req.write(rawBody);
       req.end();
-    } catch {
+    } catch (e) {
+      console.warn('[Upstash Exception]', e.message);
       resolve(null);
     }
   });
@@ -102,17 +107,13 @@ function ensureLocalDb() {
   if (!fs.existsSync(DB_DIR)) {
     try {
       fs.mkdirSync(DB_DIR, { recursive: true });
-    } catch (e) {
-      console.warn('Could not create DB dir:', e.message);
-    }
+    } catch {}
   }
 
   if (!fs.existsSync(DB_FILE)) {
     try {
       fs.writeFileSync(DB_FILE, JSON.stringify(DEFAULT_DB, null, 2), 'utf-8');
-    } catch {
-      // Ephemeral fallback
-    }
+    } catch {}
     memoryCache = { ...DEFAULT_DB };
     return memoryCache;
   }
@@ -121,15 +122,34 @@ function ensureLocalDb() {
     const raw = fs.readFileSync(DB_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
     memoryCache = {
-      tokens: { ...DEFAULT_DB.tokens, ...parsed.tokens },
-      settings: { ...DEFAULT_DB.settings, ...parsed.settings },
+      tokens: { ...DEFAULT_DB.tokens, ...(parsed.tokens || {}) },
+      settings: { ...DEFAULT_DB.settings, ...(parsed.settings || {}) },
       queue: parsed.queue || [],
       history: parsed.history || [],
     };
     return memoryCache;
-  } catch (err) {
+  } catch {
     memoryCache = { ...DEFAULT_DB };
     return memoryCache;
+  }
+}
+
+async function saveStateAsync(data) {
+  memoryCache = data;
+
+  try {
+    ensureLocalDb();
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch {}
+
+  const upstash = getUpstashConfig();
+  if (upstash) {
+    try {
+      await callUpstash('POST', '/set/postpulse_state', JSON.stringify(data));
+      console.log('[Database] ✅ State synced to Upstash Redis');
+    } catch (e) {
+      console.warn('[Database] Sync to Upstash failed:', e.message);
+    }
   }
 }
 
@@ -138,45 +158,50 @@ function saveLocalDb(data) {
   try {
     ensureLocalDb();
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
-  } catch {
-    // Ephemeral write
-  }
+  } catch {}
 
-  // Also sync to cloud KV if configured (async background sync)
   const upstash = getUpstashConfig();
   if (upstash) {
     callUpstash('POST', '/set/postpulse_state', JSON.stringify(data)).catch(() => {});
   }
 }
 
-/**
- * Load state from KV / Redis if available, or local file
- */
 async function loadStateAsync() {
   const upstash = getUpstashConfig();
   if (upstash) {
     try {
       const rawResult = await callUpstash('GET', '/get/postpulse_state');
       if (rawResult) {
-        const parsed = typeof rawResult === 'string' ? JSON.parse(rawResult) : rawResult;
-        memoryCache = {
-          tokens: { ...DEFAULT_DB.tokens, ...(parsed.tokens || {}) },
-          settings: { ...DEFAULT_DB.settings, ...(parsed.settings || {}) },
-          queue: parsed.queue || [],
-          history: parsed.history || [],
-        };
-        return memoryCache;
+        let parsed = rawResult;
+        if (typeof rawResult === 'string') {
+          try { parsed = JSON.parse(rawResult); } catch {}
+        }
+        if (parsed && typeof parsed === 'object') {
+          memoryCache = {
+            tokens: { ...DEFAULT_DB.tokens, ...(parsed.tokens || {}) },
+            settings: { ...DEFAULT_DB.settings, ...(parsed.settings || {}) },
+            queue: parsed.queue || [],
+            history: parsed.history || [],
+          };
+          return memoryCache;
+        }
       }
     } catch (e) {
-      console.warn('Could not load from Upstash:', e.message);
+      console.warn('[Database] Could not load from Upstash:', e.message);
     }
   }
   return ensureLocalDb();
 }
 
-// Synchronous and Async Helper methods
 function getTokens() {
   const db = ensureLocalDb();
+  return db.tokens;
+}
+
+async function saveTokensAsync(tokens) {
+  const db = ensureLocalDb();
+  db.tokens = { ...db.tokens, ...tokens };
+  await saveStateAsync(db);
   return db.tokens;
 }
 
@@ -184,6 +209,13 @@ function saveTokens(tokens) {
   const db = ensureLocalDb();
   db.tokens = { ...db.tokens, ...tokens };
   saveLocalDb(db);
+  return db.tokens;
+}
+
+async function clearTokensAsync() {
+  const db = ensureLocalDb();
+  db.tokens = { ...DEFAULT_DB.tokens };
+  await saveStateAsync(db);
   return db.tokens;
 }
 
@@ -199,6 +231,13 @@ function getSettings() {
   return db.settings;
 }
 
+async function updateSettingsAsync(newSettings) {
+  const db = ensureLocalDb();
+  db.settings = { ...db.settings, ...newSettings };
+  await saveStateAsync(db);
+  return db.settings;
+}
+
 function updateSettings(newSettings) {
   const db = ensureLocalDb();
   db.settings = { ...db.settings, ...newSettings };
@@ -211,6 +250,23 @@ function getQueue() {
   return db.queue;
 }
 
+async function addToQueueAsync(item) {
+  const db = ensureLocalDb();
+  const post = {
+    id: 'post_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+    content: item.content,
+    topic: item.topic || 'General',
+    tone: item.tone || 'engaging',
+    imageUrl: item.imageUrl || null,
+    scheduledFor: item.scheduledFor || null,
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  };
+  db.queue.push(post);
+  await saveStateAsync(db);
+  return post;
+}
+
 function addToQueue(item) {
   const db = ensureLocalDb();
   const post = {
@@ -218,6 +274,7 @@ function addToQueue(item) {
     content: item.content,
     topic: item.topic || 'General',
     tone: item.tone || 'engaging',
+    imageUrl: item.imageUrl || null,
     scheduledFor: item.scheduledFor || null,
     status: 'pending',
     createdAt: new Date().toISOString(),
@@ -225,6 +282,17 @@ function addToQueue(item) {
   db.queue.push(post);
   saveLocalDb(db);
   return post;
+}
+
+async function updateQueueItemAsync(id, data) {
+  const db = ensureLocalDb();
+  const index = db.queue.findIndex((p) => p.id === id);
+  if (index !== -1) {
+    db.queue[index] = { ...db.queue[index], ...data, updatedAt: new Date().toISOString() };
+    await saveStateAsync(db);
+    return db.queue[index];
+  }
+  return null;
 }
 
 function updateQueueItem(id, data) {
@@ -236,6 +304,14 @@ function updateQueueItem(id, data) {
     return db.queue[index];
   }
   return null;
+}
+
+async function removeFromQueueAsync(id) {
+  const db = ensureLocalDb();
+  const beforeLength = db.queue.length;
+  db.queue = db.queue.filter((p) => p.id !== id);
+  await saveStateAsync(db);
+  return db.queue.length < beforeLength;
 }
 
 function removeFromQueue(id) {
@@ -259,6 +335,24 @@ function getHistory() {
   return db.history.slice().reverse();
 }
 
+async function addToHistoryAsync(entry) {
+  const db = ensureLocalDb();
+  const record = {
+    id: 'hist_' + Date.now(),
+    content: entry.content,
+    topic: entry.topic || 'Manual / AI',
+    publishedAt: new Date().toISOString(),
+    status: entry.status || 'success',
+    linkedinPostUrn: entry.linkedinPostUrn || null,
+    authorUrn: entry.authorUrn || null,
+    imageUrl: entry.imageUrl || null,
+    error: entry.error || null,
+  };
+  db.history.push(record);
+  await saveStateAsync(db);
+  return record;
+}
+
 function addToHistory(entry) {
   const db = ensureLocalDb();
   const record = {
@@ -268,6 +362,8 @@ function addToHistory(entry) {
     publishedAt: new Date().toISOString(),
     status: entry.status || 'success',
     linkedinPostUrn: entry.linkedinPostUrn || null,
+    authorUrn: entry.authorUrn || null,
+    imageUrl: entry.imageUrl || null,
     error: entry.error || null,
   };
   db.history.push(record);
@@ -280,7 +376,7 @@ function getStats() {
   const now = new Date();
   const totalPublished = db.history.filter((h) => h.status === 'success').length;
   const queuedCount = db.queue.length;
-  const isConnected = !!(db.tokens.accessToken && db.tokens.profile?.urn);
+  const isConnected = !!(db.tokens.accessToken);
   const tokenExpiresAt = db.tokens.expiresAt;
   const isTokenExpired = tokenExpiresAt ? new Date(tokenExpiresAt) < now : true;
   const hasCloudStorage = !!getUpstashConfig();
@@ -289,7 +385,7 @@ function getStats() {
     totalPublished,
     queuedCount,
     isConnected: isConnected && !isTokenExpired,
-    profile: db.tokens.profile,
+    profile: db.tokens.profile || (isConnected ? { name: 'Connected User', urn: 'urn:li:person:me' } : null),
     tokenExpiresAt,
     isTokenExpired,
     schedulerActive: db.settings.schedulerActive,
@@ -305,15 +401,22 @@ module.exports = {
   loadStateAsync,
   getTokens,
   saveTokens,
+  saveTokensAsync,
   clearTokens,
+  clearTokensAsync,
   getSettings,
   updateSettings,
+  updateSettingsAsync,
   getQueue,
   addToQueue,
+  addToQueueAsync,
   updateQueueItem,
+  updateQueueItemAsync,
   removeFromQueue,
+  removeFromQueueAsync,
   popNextQueuedPost,
   getHistory,
   addToHistory,
+  addToHistoryAsync,
   getStats,
 };
