@@ -257,6 +257,9 @@ function renderStatus(status) {
     if (elements.inputOrgName) elements.inputOrgName.value = orgName;
     if (elements.inputOrgUrn) elements.inputOrgUrn.value = status.settings.organizationUrn || '';
 
+    const quickOrgInput = document.getElementById('input-quick-org-urn');
+    if (quickOrgInput) quickOrgInput.value = status.settings.organizationUrn || '';
+
     updateTargetUI(appState.currentTarget, orgName);
   }
 
@@ -455,7 +458,15 @@ function bindEventListeners() {
   // Generate AI Post
   elements.btnGenerateAi.addEventListener('click', handleGenerateAiPost);
 
-  // 1-Click Quick Hiring Campaign Generator
+  // Quick Org Input Synchronizer
+  const quickOrgInput = document.getElementById('input-quick-org-urn');
+  if (quickOrgInput) {
+    quickOrgInput.addEventListener('input', () => {
+      const val = quickOrgInput.value.trim();
+      if (elements.inputOrgUrn) elements.inputOrgUrn.value = val;
+      updateSettingsOnServer({ organizationUrn: val });
+    });
+  }
   const btnQuickHiring = document.getElementById('btn-quick-hiring');
   if (btnQuickHiring) {
     btnQuickHiring.addEventListener('click', () => {
@@ -684,6 +695,12 @@ async function handlePublishNow() {
     return showToast('Please connect your LinkedIn account first (top right).', 'error');
   }
 
+  const orgUrnInput = document.getElementById('input-quick-org-urn')?.value.trim() || elements.inputOrgUrn?.value.trim();
+  if (appState.currentTarget === 'organization' && !orgUrnInput) {
+    document.getElementById('input-quick-org-urn')?.focus();
+    return showToast('⚠️ Please paste your Verdian Company Page ID or URL above before posting!', 'error');
+  }
+
   const targetName = appState.currentTarget === 'organization' ? 'Verdian' : 'Personal Profile';
   elements.btnPublishNow.disabled = true;
   elements.btnPublishNow.innerHTML = `⏳ Publishing to ${targetName}...`;
@@ -696,8 +713,9 @@ async function handlePublishNow() {
         topic: appState.currentTopic,
         imageUrl: appState.currentImage && appState.currentImage.startsWith('http') ? appState.currentImage : undefined,
         imageData: appState.currentImage && appState.currentImage.startsWith('data:') ? appState.currentImage : undefined,
+        attachPoster: appState.currentImage === '/assets/veridian-hiring-poster.jpg',
         targetType: appState.currentTarget,
-        organizationUrn: elements.inputOrgUrn?.value.trim() || undefined,
+        organizationUrn: orgUrnInput || undefined,
       }),
     });
 

@@ -147,7 +147,10 @@
 
           <!-- Target Entity Selector -->
           <div class="form-group target-selector-group">
-            <label class="form-label">Post Destination</label>
+            <div class="flex-between mb-1">
+              <label class="form-label mb-0">Post Destination (Strict Mode)</label>
+              <span class="safe-badge">🔒 Locked to Selected</span>
+            </div>
             <div class="target-options">
               <label class="target-option-btn active" id="opt-target-org">
                 <input type="radio" name="studioTarget" value="organization" checked>
@@ -157,6 +160,15 @@
                 <input type="radio" name="studioTarget" value="person">
                 <span>👤 Personal Profile</span>
               </label>
+            </div>
+
+            <!-- Quick Verdian Company ID / URL input -->
+            <div id="quick-org-input-box" class="quick-org-input mt-2">
+              <div class="flex-between">
+                <label class="form-label" style="font-size:0.75rem;">Verdian Company Page ID or LinkedIn URL:</label>
+                <a href="https://www.linkedin.com/company/" target="_blank" rel="noopener" class="form-hint" style="margin-top:0;">Find Page ID ↗</a>
+              </div>
+              <input type="text" id="input-quick-org-urn" class="form-control" placeholder="e.g. 105829104 or https://linkedin.com/company/verdian/admin" style="font-size:0.82rem; padding: 0.5rem 0.75rem;">
             </div>
           </div>
 

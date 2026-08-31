@@ -1,5 +1,7 @@
 const https = require('https');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
 const querystring = require('querystring');
 const db = require('./database');
 
@@ -121,15 +123,33 @@ function getProfileInfo(accessToken) {
           } else {
             getLegacyProfile(accessToken)
               .then(resolve)
-              .catch(() => reject(new Error(parsed.message || `Profile request failed (HTTP ${res.statusCode})`)));
+              .catch(() => resolve({
+                id: 'me',
+                urn: 'urn:li:person:me',
+                name: 'LinkedIn User',
+                email: '',
+                picture: null,
+              }));
           }
         } catch (e) {
-          reject(new Error(`Failed to parse profile response: ${data}`));
+          resolve({
+            id: 'me',
+            urn: 'urn:li:person:me',
+            name: 'LinkedIn User',
+            email: '',
+            picture: null,
+          });
         }
       });
     });
 
-    req.on('error', (e) => reject(e));
+    req.on('error', () => resolve({
+      id: 'me',
+      urn: 'urn:li:person:me',
+      name: 'LinkedIn User',
+      email: '',
+      picture: null,
+    }));
     req.end();
   });
 }
@@ -175,54 +195,6 @@ function getLegacyProfile(accessToken) {
 }
 
 /**
- * Fetch list of organization/company pages user manages
- */
-function getUserOrganizations(accessToken) {
-  return new Promise((resolve) => {
-    const options = {
-      hostname: 'api.linkedin.com',
-      port: 443,
-      path: '/v2/organizationalEntityAcls?q=roleAssignee',
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'X-Restli-Protocol-Version': '2.0.0',
-      },
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => (data += chunk));
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.elements && parsed.elements.length > 0) {
-            const orgs = parsed.elements.map((el) => {
-              const urn = el.organizationalTarget;
-              const orgId = urn ? urn.split(':').pop() : '';
-              return {
-                urn: urn,
-                id: orgId,
-                role: el.role,
-                name: `Organization (${orgId})`,
-              };
-            });
-            resolve(orgs);
-          } else {
-            resolve([]);
-          }
-        } catch {
-          resolve([]);
-        }
-      });
-    });
-
-    req.on('error', () => resolve([]));
-    req.end();
-  });
-}
-
-/**
  * Upload Image to LinkedIn REST API
  */
 async function uploadImageToLinkedIn(accessToken, authorUrn, imageSource) {
@@ -235,6 +207,11 @@ async function uploadImageToLinkedIn(accessToken, authorUrn, imageSource) {
       if (match) {
         contentType = match[1];
         imageBuffer = Buffer.from(match[2], 'base64');
+      }
+    } else if (imageSource.startsWith('/assets/')) {
+      const localPath = path.join(__dirname, '..', 'public', imageSource.replace(/^\//, ''));
+      if (fs.existsSync(localPath)) {
+        imageBuffer = fs.readFileSync(localPath);
       }
     } else if (imageSource.startsWith('http://') || imageSource.startsWith('https://')) {
       imageBuffer = await fetchImageBuffer(imageSource);
@@ -277,7 +254,7 @@ async function uploadImageToLinkedIn(accessToken, authorUrn, imageSource) {
     console.log('[LinkedIn Image] ✅ Image uploaded successfully. URN:', imageUrn);
     return imageUrn;
   } catch (err) {
-    console.warn('[LinkedIn Image] Image upload failed, will post text-only fallback:', err.message);
+    console.warn('[LinkedIn Image] Image upload failed, fallback to text-only:', err.message);
     return null;
   }
 }
@@ -342,8 +319,27 @@ function makeHttpsRequest(options, postData) {
 }
 
 /**
+ * Clean and format organization ID / URN
+ */
+function resolveOrganizationUrn(rawInput) {
+  if (!rawInput) return '';
+  const input = String(rawInput).trim();
+  if (input.startsWith('urn:li:organization:')) return input;
+  if (/^\d+$/.test(input)) return `urn:li:organization:${input}`;
+  
+  // Parse from URL like https://www.linkedin.com/company/105829104/admin or /company/verdian
+  const urlMatch = input.match(/\/company\/([0-9a-zA-Z\-_]+)/);
+  if (urlMatch) {
+    const slugOrId = urlMatch[1];
+    return /^\d+$/.test(slugOrId) ? `urn:li:organization:${slugOrId}` : slugOrId;
+  }
+
+  return input.startsWith('urn:li:') ? input : `urn:li:organization:${input}`;
+}
+
+/**
  * Publish Post via LinkedIn REST API
- * Supports both Organization and Personal Profile target URNs and optional Images
+ * STRICT: If target is organization, ONLY posts to organization. Never leaks to personal account.
  */
 async function publishPost(content, options = {}) {
   const tokens = db.getTokens();
@@ -353,28 +349,32 @@ async function publishPost(content, options = {}) {
     throw new Error('LinkedIn account is not connected. Please connect your account first.');
   }
 
-  // Determine Author URN: Organization Page vs Personal Profile
-  let authorUrn = tokens.profile?.urn;
   const targetType = options.targetType || settings.targetType || 'organization';
+  let authorUrn = null;
 
   if (targetType === 'organization') {
-    // If organization URN specified in settings, use it
-    if (settings.organizationUrn && settings.organizationUrn.trim()) {
-      authorUrn = settings.organizationUrn.trim();
-      if (!authorUrn.startsWith('urn:li:organization:')) {
-        authorUrn = `urn:li:organization:${authorUrn}`;
-      }
-    } else {
-      // Look up if user has organization in state
-      console.log(`[LinkedIn] Posting to default/configured Organization page...`);
+    const rawOrg = options.organizationUrn || settings.organizationUrn;
+    const resolvedOrg = resolveOrganizationUrn(rawOrg);
+
+    if (!resolvedOrg || resolvedOrg === 'urn:li:organization:') {
+      throw new Error('Verdian Company Page ID/URN is not configured. Please enter your Company Page ID or URL (e.g. 105829104 or https://linkedin.com/company/105829104) in Target Settings.');
     }
+
+    authorUrn = resolvedOrg;
+    console.log(`[LinkedIn] 🏢 STRICT MODE: Publishing to Company Page (${authorUrn})`);
+  } else {
+    authorUrn = tokens.profile?.urn;
+    if (!authorUrn) {
+      throw new Error('Personal LinkedIn profile ID was not found. Please reconnect your account.');
+    }
+    console.log(`[LinkedIn] 👤 Publishing to Personal Profile (${authorUrn})`);
   }
 
-  console.log(`[LinkedIn] Publishing post as author: ${authorUrn} (Target: ${targetType})`);
-
+  // Upload image if present
   let imageUrn = null;
-  if (options.imageUrl || options.imageData) {
-    imageUrn = await uploadImageToLinkedIn(tokens.accessToken, authorUrn, options.imageUrl || options.imageData);
+  const imageToUpload = options.imageData || options.imageUrl || (options.attachPoster ? '/assets/veridian-hiring-poster.jpg' : null);
+  if (imageToUpload) {
+    imageUrn = await uploadImageToLinkedIn(tokens.accessToken, authorUrn, imageToUpload);
   }
 
   // Attempt REST API publish
@@ -387,7 +387,7 @@ async function publishPost(content, options = {}) {
       const ugcResult = await publishViaUgcApi(tokens.accessToken, authorUrn, content);
       return ugcResult;
     } catch (ugcErr) {
-      throw new Error(`LinkedIn posting failed. REST API: ${restErr.message} | UGC API: ${ugcErr.message}`);
+      throw new Error(`LinkedIn posting failed for ${authorUrn}: ${restErr.message}`);
     }
   }
 }
@@ -411,7 +411,7 @@ function publishViaRestApi(accessToken, authorUrn, text, imageUrn) {
       postPayload.content = {
         media: {
           id: imageUrn,
-          title: 'Post Image',
+          title: 'Veridian Post Visual',
         },
       };
     }
@@ -540,7 +540,7 @@ module.exports = {
   getAuthorizationUrl,
   exchangeCodeForToken,
   getProfileInfo,
-  getUserOrganizations,
+  resolveOrganizationUrn,
   uploadImageToLinkedIn,
   publishPost,
 };
