@@ -31,8 +31,22 @@ const DEFAULT_DB = {
 let memoryCache = null;
 
 function getUpstashConfig() {
-  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  // Check direct standard names and custom prefix like STORAGE_REST_API_URL / STORAGE_URL
+  let url = process.env.STORAGE_REST_API_URL || process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || process.env.STORAGE_URL;
+  let token = process.env.STORAGE_REST_API_TOKEN || process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || process.env.STORAGE_TOKEN;
+
+  // Dynamic fallback search for any *_REST_API_URL in environment
+  if (!url || !token) {
+    for (const key in process.env) {
+      if (key.endsWith('_REST_API_URL')) {
+        url = process.env[key];
+        const prefix = key.replace('_REST_API_URL', '');
+        token = process.env[`${prefix}_REST_API_TOKEN`] || process.env[`${prefix}_TOKEN`];
+        if (url && token) break;
+      }
+    }
+  }
+
   return url && token ? { url: url.replace(/\/$/, ''), token } : null;
 }
 
