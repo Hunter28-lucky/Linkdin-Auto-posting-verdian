@@ -203,21 +203,42 @@ function getUserOrganizations(accessToken) {
  * Resolve Organization Numeric URN from numeric ID, admin URL, or auto-detection
  */
 async function resolveOrganizationUrn(accessToken, rawInput) {
-  const input = String(rawInput || '').trim();
+  let input = String(rawInput || '').trim();
 
-  // 1. Direct number check (e.g. 105829104 or urn:li:organization:105829104)
-  if (/^\d+$/.test(input)) return `urn:li:organization:${input}`;
-  if (input.startsWith('urn:li:organization:') && /^\d+$/.test(input.replace('urn:li:organization:', ''))) {
-    return input;
+  // Strip urn prefix for easier parsing
+  const urnPrefix = 'urn:li:organization:';
+
+  // 0. If empty/blank, use the hardcoded Veridian default
+  if (!input) {
+    console.log('[LinkedIn] No organization URN provided, using default Veridian ID: 117254291');
+    return `${urnPrefix}117254291`;
   }
 
-  // 2. Extract numeric ID from URL if present (e.g. linkedin.com/company/105829104/admin)
+  // 1. Direct number check (e.g. 117254291)
+  if (/^\d+$/.test(input)) return `${urnPrefix}${input}`;
+
+  // 2. Full URN check (e.g. urn:li:organization:117254291)
+  if (input.startsWith(urnPrefix)) {
+    const orgId = input.slice(urnPrefix.length).trim();
+    if (/^\d+$/.test(orgId)) {
+      return `${urnPrefix}${orgId}`;
+    }
+  }
+
+  // 3. Extract numeric ID from URL if present (e.g. linkedin.com/company/117254291/admin)
   const numericUrlMatch = input.match(/\/company\/(\d+)/);
   if (numericUrlMatch) {
-    return `urn:li:organization:${numericUrlMatch[1]}`;
+    return `${urnPrefix}${numericUrlMatch[1]}`;
   }
 
-  // 3. Auto-detect from user's administered organizations via LinkedIn API
+  // 4. Try to extract any numeric sequence that looks like an org ID (6+ digits)
+  const anyNumericMatch = input.match(/(\d{6,})/);
+  if (anyNumericMatch) {
+    console.log(`[LinkedIn] Extracted numeric org ID from input: ${anyNumericMatch[1]}`);
+    return `${urnPrefix}${anyNumericMatch[1]}`;
+  }
+
+  // 5. Auto-detect from user's administered organizations via LinkedIn API
   try {
     const orgs = await getUserOrganizations(accessToken);
     if (orgs && orgs.length > 0) {
@@ -229,12 +250,9 @@ async function resolveOrganizationUrn(accessToken, rawInput) {
     console.warn('[LinkedIn] Auto-detect orgs notice:', e.message);
   }
 
-  // 4. If non-numeric string (e.g. "veridian-digital-ai") and could not resolve, explain to user
-  if (!/^\d+$/.test(input.replace(/^urn:li:organization:/, ''))) {
-    throw new Error(`LinkedIn requires your NUMERIC Company Page ID. In your LinkedIn company admin URL (e.g., linkedin.com/company/105829104/admin), copy the number (e.g. 105829104) and paste it into the box.`);
-  }
-
-  return `urn:li:organization:${input.replace(/^urn:li:organization:/, '')}`;
+  // 6. Final fallback to Veridian default
+  console.warn(`[LinkedIn] Could not resolve org URN from input "${input}", falling back to Veridian default (117254291)`);
+  return `${urnPrefix}117254291`;
 }
 
 /**

@@ -285,7 +285,12 @@ function renderStatus(status) {
     if (elements.inputOrgUrn) elements.inputOrgUrn.value = status.settings.organizationUrn || '';
 
     const quickOrgInput = document.getElementById('input-quick-org-urn');
-    if (quickOrgInput) quickOrgInput.value = status.settings.organizationUrn || '';
+    if (quickOrgInput) {
+      // Extract just the numeric ID from a full URN like 'urn:li:organization:117254291'
+      let orgValue = status.settings.organizationUrn || '117254291';
+      orgValue = orgValue.replace(/^urn:li:organization:/, '').trim();
+      quickOrgInput.value = orgValue;
+    }
 
     updateTargetUI(appState.currentTarget, orgName);
   }
@@ -722,10 +727,12 @@ async function handlePublishNow() {
     return showToast('Please connect your LinkedIn account first (top right).', 'error');
   }
 
-  const orgUrnInput = document.getElementById('input-quick-org-urn')?.value.trim() || elements.inputOrgUrn?.value.trim();
+  let orgUrnInput = document.getElementById('input-quick-org-urn')?.value.trim() || elements.inputOrgUrn?.value.trim();
+  // Strip urn prefix to get just the numeric ID
+  if (orgUrnInput) orgUrnInput = orgUrnInput.replace(/^urn:li:organization:/, '').trim();
+  // Default to Veridian's known Company Page ID
   if (appState.currentTarget === 'organization' && !orgUrnInput) {
-    document.getElementById('input-quick-org-urn')?.focus();
-    return showToast('⚠️ Please paste your Verdian Company Page ID or URL above before posting!', 'error');
+    orgUrnInput = '117254291';
   }
 
   const targetName = appState.currentTarget === 'organization' ? 'Verdian' : 'Personal Profile';
