@@ -16,6 +16,83 @@ const state = {
   activeTab: 'studio',
 };
 
+// ==========================================
+// AUTH STORAGE & API CLIENT (SERVERLESS SAFE)
+// ==========================================
+
+function getStoredAuth() {
+  try {
+    const raw = localStorage.getItem('postpulse_auth');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
+}
+
+function setStoredAuth(data) {
+  try {
+    localStorage.setItem('postpulse_auth', JSON.stringify(data));
+  } catch (e) {}
+}
+
+function clearStoredAuth() {
+  try {
+    localStorage.removeItem('postpulse_auth');
+  } catch (e) {}
+}
+
+/**
+ * Checks URL query parameters for OAuth success redirect (e.g. ?connected=true&token=...)
+ * Stores token & profile securely in localStorage and cleans the URL bar.
+ */
+function checkUrlAuth() {
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const connected = urlParams.get('connected');
+    const name = urlParams.get('name');
+    const urn = urlParams.get('urn');
+    const avatar = urlParams.get('avatar');
+
+    if (connected === 'true' && token) {
+      const authData = {
+        token: token.trim(),
+        name: name ? decodeURIComponent(name) : 'LinkedIn User',
+        urn: urn ? decodeURIComponent(urn) : 'urn:li:person:me',
+        avatar: avatar ? decodeURIComponent(avatar) : '',
+        savedAt: Date.now(),
+      };
+      setStoredAuth(authData);
+
+      // Clean the URL so access token isn't exposed in browser address bar
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return authData;
+    }
+  } catch (err) {
+    console.warn('URL Auth check error:', err);
+  }
+  return null;
+}
+
+/**
+ * Authenticated API Fetch Wrapper
+ * Automatically transmits LinkedIn tokens and profile headers to backend
+ * (Essential for Vercel Serverless where memory isn't shared across lambdas)
+ */
+function apiFetch(url, options = {}) {
+  const headers = options.headers ? { ...options.headers } : {};
+  const auth = getStoredAuth();
+  if (auth && auth.token) {
+    headers['Authorization'] = `Bearer ${auth.token}`;
+    headers['x-linkedin-token'] = auth.token;
+    headers['x-user-urn'] = encodeURIComponent(auth.urn || 'urn:li:person:me');
+    headers['x-user-name'] = encodeURIComponent(auth.name || 'LinkedIn User');
+    if (auth.avatar) {
+      headers['x-user-avatar'] = encodeURIComponent(auth.avatar);
+    }
+  }
+  return fetch(url, { ...options, headers, credentials: 'include' });
+}
+
 // Toast notification helper
 function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
@@ -36,7 +113,65 @@ function showToast(message, type = 'info') {
   }, 3500);
 }
 
+// Centralized UI Connection State Renderer
+function updateAuthUI(isConnected, user) {
+  const connPill = document.getElementById('connection-status-pill');
+  const connLabel = document.getElementById('connection-label');
+  const userHeader = document.getElementById('user-profile-header');
+  const userAvatar = document.getElementById('user-avatar');
+  const userName = document.getElementById('user-name');
+  const btnConnect = document.getElementById('btn-connect-linkedin');
+  const authBanner = document.getElementById('auth-alert-banner');
+  const previewAvatar = document.getElementById('preview-avatar');
+  const previewName = document.getElementById('preview-name');
+  const settingsName = document.getElementById('settings-user-name');
+  const settingsAvatar = document.getElementById('settings-user-avatar');
+
+  if (isConnected && user) {
+    if (connPill) {
+      connPill.className = 'status-pill connected';
+      if (connLabel) connLabel.textContent = 'Active Profile';
+    }
+    const avatarUrl = user.picture || user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'LinkedIn User')}&background=0a66c2&color=fff`;
+
+    if (userHeader) userHeader.classList.remove('hidden');
+    if (userAvatar) userAvatar.src = avatarUrl;
+    if (userName) userName.textContent = user.name || 'LinkedIn User';
+    if (previewAvatar) previewAvatar.src = avatarUrl;
+    if (previewName) previewName.textContent = user.name || 'LinkedIn User';
+    if (btnConnect) btnConnect.classList.add('hidden');
+    if (authBanner) authBanner.classList.add('hidden');
+    if (settingsName) settingsName.textContent = `${user.name || 'LinkedIn User'} (Personal Account)`;
+    if (settingsAvatar) settingsAvatar.src = avatarUrl;
+  } else {
+    if (connPill) {
+      connPill.className = 'status-pill disconnected';
+      if (connLabel) connLabel.textContent = 'Disconnected';
+    }
+    if (userHeader) userHeader.classList.add('hidden');
+    if (btnConnect) btnConnect.classList.remove('hidden');
+    if (authBanner) authBanner.classList.remove('hidden');
+    if (settingsName) settingsName.textContent = 'Not Connected';
+  }
+}
+
+// ==========================================
+// DOM INITIALIZATION
+// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
+  // 1. Check for OAuth callback parameters from URL
+  const urlAuth = checkUrlAuth();
+
+  // 2. Immediate Client-Side Auth Render (instant feedback, zero delay)
+  const storedAuth = urlAuth || getStoredAuth();
+  if (storedAuth && storedAuth.token) {
+    updateAuthUI(true, storedAuth);
+    if (urlAuth) {
+      showToast(`Welcome ${storedAuth.name}! Personal LinkedIn Profile connected. 🚀`, 'success');
+    }
+  }
+
+  // 3. Initialize UI controls
   initTabs();
   initSparks();
   initTopicChips();
@@ -52,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initManualTokenForm();
   initSettingsKey();
 
-  // Load initial system data
+  // 4. Fetch server state and sync
   fetchStatus();
   fetchQueue();
   fetchHistory();
@@ -186,7 +321,6 @@ function initPostEditor() {
 
     if (preview) {
       if (editor.value.trim()) {
-        // Format hashtags into styled spans
         const formatted = editor.value
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
@@ -314,7 +448,7 @@ function initImageStudio() {
       regenBtn.innerHTML = '<span class="regen-icon">⏳</span> Generating...';
 
       try {
-        const res = await fetch('/api/ai/generate-image', {
+        const res = await apiFetch('/api/ai/generate-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -445,7 +579,7 @@ function initActionButtons() {
       generateBtn.innerHTML = '<span class="btn-icon">⏳</span> Synthesizing Post & Flux AI Visual...';
 
       try {
-        const res = await fetch('/api/posts/generate', {
+        const res = await apiFetch('/api/posts/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -498,7 +632,7 @@ function initActionButtons() {
       publishBtn.innerHTML = 'Publishing to Personal Profile... ⏳';
 
       try {
-        const res = await fetch('/api/posts/publish-now', {
+        const res = await apiFetch('/api/posts/publish-now', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -538,7 +672,7 @@ function initActionButtons() {
       }
 
       try {
-        const res = await fetch('/api/queue', {
+        const res = await apiFetch('/api/queue', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -571,7 +705,7 @@ function initActionButtons() {
       triggerCronBtn.textContent = 'Running Autopilot Job...';
 
       try {
-        const res = await fetch('/api/scheduler/trigger-now', { method: 'POST' });
+        const res = await apiFetch('/api/scheduler/trigger-now', { method: 'POST' });
         const data = await res.json();
         if (data.success) {
           showToast('Daily autopilot run completed & published! 🚀', 'success');
@@ -604,7 +738,7 @@ function initScheduleForm() {
     const days = Array.from(document.querySelectorAll('.days-selector input:checked')).map((cb) => cb.value);
 
     try {
-      const res = await fetch('/api/settings', {
+      const res = await apiFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scheduleTime: time, scheduleDays: days, autopilotMode }),
@@ -630,13 +764,20 @@ function initManualTokenForm() {
     if (!token) return;
 
     try {
-      const res = await fetch('/api/auth/manual-token', {
+      const res = await apiFetch('/api/auth/manual-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accessToken: token }),
       });
       const data = await res.json();
       if (data.success) {
+        setStoredAuth({
+          token,
+          name: data.profile?.name || 'LinkedIn User',
+          urn: data.profile?.urn || 'urn:li:person:me',
+          avatar: data.profile?.picture || '',
+          savedAt: Date.now(),
+        });
         showToast('LinkedIn personal profile token saved! ✅', 'success');
         fetchStatus();
       } else {
@@ -655,7 +796,7 @@ function initSettingsKey() {
   saveKeyBtn.addEventListener('click', async () => {
     const key = document.getElementById('setting-gemini-key')?.value?.trim();
     try {
-      const res = await fetch('/api/settings', {
+      const res = await apiFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ geminiApiKey: key }),
@@ -675,68 +816,39 @@ function initSettingsKey() {
 // ==========================================
 async function fetchStatus() {
   try {
-    const res = await fetch('/api/status');
+    const res = await apiFetch('/api/status');
     const data = await res.json();
     state.status = data;
 
-    // Update Connection Status
-    const connPill = document.getElementById('connection-status-pill');
-    const connLabel = document.getElementById('connection-label');
-    const userHeader = document.getElementById('user-profile-header');
-    const userAvatar = document.getElementById('user-avatar');
-    const userName = document.getElementById('user-name');
-    const btnConnect = document.getElementById('btn-connect-linkedin');
-    const authBanner = document.getElementById('auth-alert-banner');
-    const previewAvatar = document.getElementById('preview-avatar');
-    const previewName = document.getElementById('preview-name');
+    const storedAuth = getStoredAuth();
+    const isConnected = data.connected || data.isConnected || (storedAuth && !!storedAuth.token);
+    const user = data.user || data.profile || storedAuth;
 
-    if (data.connected && data.user) {
-      if (connPill) {
-        connPill.className = 'status-pill connected';
-        if (connLabel) connLabel.textContent = 'Active Profile';
-      }
-      if (userHeader) userHeader.classList.remove('hidden');
-      if (userAvatar) userAvatar.src = data.user.picture || 'https://ui-avatars.com/api/?name=LinkedIn+User';
-      if (userName) userName.textContent = data.user.name || 'LinkedIn User';
-      if (previewAvatar && data.user.picture) previewAvatar.src = data.user.picture;
-      if (previewName) previewName.textContent = data.user.name || 'LinkedIn User';
-      if (btnConnect) btnConnect.classList.add('hidden');
-      if (authBanner) authBanner.classList.add('hidden');
-    } else {
-      if (connPill) {
-        connPill.className = 'status-pill disconnected';
-        if (connLabel) connLabel.textContent = 'Disconnected';
-      }
-      if (userHeader) userHeader.classList.add('hidden');
-      if (btnConnect) btnConnect.classList.remove('hidden');
-      if (authBanner) authBanner.classList.remove('hidden');
-    }
-
-    // Update settings tab view
-    const settingsName = document.getElementById('settings-user-name');
-    const settingsAvatar = document.getElementById('settings-user-avatar');
-    if (data.connected && data.user) {
-      if (settingsName) settingsName.textContent = `${data.user.name} (Personal Account)`;
-      if (settingsAvatar) settingsAvatar.src = data.user.picture || 'https://ui-avatars.com/api/?name=LinkedIn+User';
-    }
+    updateAuthUI(isConnected, user);
 
     // Update disconnect button
     document.getElementById('btn-disconnect')?.addEventListener('click', async () => {
       if (confirm('Disconnect LinkedIn account?')) {
-        await fetch('/api/auth/disconnect', { method: 'POST' });
+        clearStoredAuth();
+        updateAuthUI(false, null);
+        await apiFetch('/api/auth/disconnect', { method: 'POST' });
         showToast('LinkedIn account disconnected', 'info');
-        fetchStatus();
       }
     });
 
   } catch (err) {
     console.error('Failed to fetch status:', err);
+    // If network or serverless error, still preserve authenticated local state
+    const storedAuth = getStoredAuth();
+    if (storedAuth && storedAuth.token) {
+      updateAuthUI(true, storedAuth);
+    }
   }
 }
 
 async function fetchQueue() {
   try {
-    const res = await fetch('/api/queue');
+    const res = await apiFetch('/api/queue');
     const data = await res.json();
     state.queue = data.queue || [];
 
@@ -780,7 +892,7 @@ async function fetchQueue() {
 
 async function publishQueueItem(id) {
   try {
-    const res = await fetch(`/api/queue/${id}/publish-now`, { method: 'POST' });
+    const res = await apiFetch(`/api/queue/${id}/publish-now`, { method: 'POST' });
     const data = await res.json();
     if (data.success) {
       showToast('Post published to Personal Profile! 🚀', 'success');
@@ -796,7 +908,7 @@ async function publishQueueItem(id) {
 
 async function deleteQueueItem(id) {
   try {
-    const res = await fetch(`/api/queue/${id}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/queue/${id}`, { method: 'DELETE' });
     const data = await res.json();
     if (data.success) {
       showToast('Item deleted from queue', 'info');
@@ -809,7 +921,7 @@ async function deleteQueueItem(id) {
 
 async function fetchHistory() {
   try {
-    const res = await fetch('/api/history');
+    const res = await apiFetch('/api/history');
     const data = await res.json();
     state.history = data.history || [];
 
@@ -851,6 +963,6 @@ async function fetchHistory() {
   }
 }
 
-// Make functions accessible globally for inline onclick
+// Global functions for inline onclick handlers
 window.publishQueueItem = publishQueueItem;
 window.deleteQueueItem = deleteQueueItem;

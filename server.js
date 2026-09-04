@@ -21,15 +21,18 @@ app.use(async (req, res, next) => {
     await db.loadStateAsync();
   } catch (e) {}
 
-  // Check client Authorization header or cookie for token fallback
+  // Check client Authorization header, cookie, or query parameter for token fallback
   const authHeader = req.headers['authorization'] || req.headers['x-linkedin-token'];
   const cookieHeader = req.headers['cookie'];
+  const queryToken = req.query?.token;
 
   let clientToken = null;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     clientToken = authHeader.replace('Bearer ', '').trim();
   } else if (authHeader) {
     clientToken = authHeader.trim();
+  } else if (queryToken && typeof queryToken === 'string') {
+    clientToken = queryToken.trim();
   } else if (cookieHeader) {
     const match = cookieHeader.match(/postpulse_token=([^;]+)/);
     if (match) clientToken = decodeURIComponent(match[1]);
@@ -38,6 +41,7 @@ app.use(async (req, res, next) => {
   if (clientToken && (!db.getTokens().accessToken || db.getTokens().accessToken !== clientToken)) {
     const userUrn = req.headers['x-user-urn'] ? decodeURIComponent(req.headers['x-user-urn']) : 'urn:li:person:me';
     const userName = req.headers['x-user-name'] ? decodeURIComponent(req.headers['x-user-name']) : 'Connected User';
+    const userAvatar = req.headers['x-user-avatar'] ? decodeURIComponent(req.headers['x-user-avatar']) : null;
 
     db.saveTokens({
       accessToken: clientToken,
@@ -47,7 +51,7 @@ app.use(async (req, res, next) => {
         urn: userUrn,
         name: userName,
         email: '',
-        picture: null,
+        picture: userAvatar,
       },
     });
   }
@@ -212,8 +216,15 @@ app.get('/api/health', (req, res) => {
 app.get('/api/status', (req, res) => {
   const stats = db.getStats();
   const settings = db.getSettings();
+  const isConn = !!stats.isConnected;
+  const prof = stats.profile;
+
   res.json({
     ...stats,
+    connected: isConn,
+    isConnected: isConn,
+    user: prof,
+    profile: prof,
     settings,
   });
 });
