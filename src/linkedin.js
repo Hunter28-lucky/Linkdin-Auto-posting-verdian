@@ -18,7 +18,9 @@ function getAuthConfig(customRedirectUri) {
  */
 function getAuthorizationUrl(state = 'linkedin_auto_auth_' + Date.now(), customRedirectUri) {
   const { clientId, redirectUri } = getAuthConfig(customRedirectUri);
-  const scopes = ['openid', 'profile', 'email', 'w_member_social', 'w_organization_social'].join(' ');
+  // Personal Profile scopes: openid, profile, email, w_member_social
+  // w_organization_social is removed because requesting unapproved scopes causes LinkedIn "Bummer, something went wrong"
+  const scopes = ['openid', 'profile', 'email', 'w_member_social'].join(' ');
 
   const params = querystring.stringify({
     response_type: 'code',
