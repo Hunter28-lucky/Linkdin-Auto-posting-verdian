@@ -258,13 +258,33 @@ async function resolveOrganizationUrn(accessToken, rawInput) {
 }
 
 /**
- * Upload Image to LinkedIn REST API
+ * Resolve member's permanent personal URN from /v2/userinfo
  */
-async function uploadImageToLinkedIn(accessToken, authorUrn, imageSource) {
+async function resolveMemberUrn(accessToken, currentUrn) {
+  if (currentUrn && !currentUrn.endsWith(':me') && currentUrn.startsWith('urn:li:person:')) {
+    return currentUrn;
+  }
   try {
-    let imageBuffer = null;
-    let contentType = 'image/jpeg';
+    const profile = await getProfileInfo(accessToken);
+    if (profile && profile.urn && !profile.urn.endsWith(':me')) {
+      console.log(`[LinkedIn] ✅ Resolved real member URN: ${profile.urn}`);
+      return profile.urn;
+    }
+  } catch (e) {
+    console.warn('[LinkedIn] Could not resolve real member URN:', e.message);
+  }
+  return currentUrn || 'urn:li:person:me';
+}
 
+/**
+ * Load image buffer from data URI, local path, or remote URL
+ */
+async function loadImageBuffer(imageSource) {
+  if (!imageSource) return null;
+  let imageBuffer = null;
+  let contentType = 'image/jpeg';
+
+  try {
     if (imageSource.startsWith('data:')) {
       const match = imageSource.match(/^data:(image\/[a-zA-Z0-9\+\-]+);base64,(.+)$/);
       if (match) {
@@ -275,14 +295,80 @@ async function uploadImageToLinkedIn(accessToken, authorUrn, imageSource) {
       const localPath = path.join(__dirname, '..', 'public', imageSource.replace(/^\//, ''));
       if (fs.existsSync(localPath)) {
         imageBuffer = fs.readFileSync(localPath);
+        if (imageSource.endsWith('.png')) contentType = 'image/png';
+        if (imageSource.endsWith('.webp')) contentType = 'image/webp';
       }
     } else if (imageSource.startsWith('http://') || imageSource.startsWith('https://')) {
       imageBuffer = await fetchImageBuffer(imageSource);
+      if (imageSource.includes('.png')) contentType = 'image/png';
+      if (imageSource.includes('.webp')) contentType = 'image/webp';
+    }
+  } catch (err) {
+    console.warn('[LinkedIn Image] Buffer extraction failed:', err.message);
+    return null;
+  }
+
+  return imageBuffer ? { buffer: imageBuffer, contentType } : null;
+}
+
+/**
+ * Upload Image for UGC API (/v2/ugcPosts)
+ * Uses /v2/assets?action=registerUpload with recipe urn:li:digitalmediaRecipe:feedshare-image
+ * Returns urn:li:digitalmediaAsset:...
+ */
+async function uploadAssetForUgc(accessToken, authorUrn, imageBuffer, contentType = 'image/jpeg') {
+  try {
+    const registerData = JSON.stringify({
+      registerUploadRequest: {
+        recipes: ['urn:li:digitalmediaRecipe:feedshare-image'],
+        owner: authorUrn,
+        serviceRelationships: [
+          {
+            relationshipType: 'OWNER',
+            identifier: 'urn:li:userGeneratedContent',
+          },
+        ],
+      },
+    });
+
+    const regOptions = {
+      hostname: 'api.linkedin.com',
+      port: 443,
+      path: '/v2/assets?action=registerUpload',
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'X-Restli-Protocol-Version': '2.0.0',
+        'Content-Length': Buffer.byteLength(registerData),
+      },
+    };
+
+    const regRes = await makeHttpsRequest(regOptions, registerData);
+    const uploadUrl = regRes.value?.uploadMechanism?.['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']?.uploadUrl;
+    const assetUrn = regRes.value?.asset;
+
+    if (!uploadUrl || !assetUrn) {
+      console.warn('[LinkedIn UGC Asset] Register upload did not yield uploadUrl/asset:', JSON.stringify(regRes));
+      return null;
     }
 
-    if (!imageBuffer) return null;
+    await uploadBinary(uploadUrl, imageBuffer, contentType);
+    console.log('[LinkedIn UGC Asset] ✅ Asset uploaded successfully. Asset URN:', assetUrn);
+    return assetUrn;
+  } catch (err) {
+    console.warn('[LinkedIn UGC Asset] Asset upload warning:', err.message);
+    return null;
+  }
+}
 
-    // Step 1: Initialize Image Upload
+/**
+ * Upload Image for REST API (/rest/posts)
+ * Uses /rest/images?action=initializeUpload
+ * Returns urn:li:image:...
+ */
+async function uploadImageForRest(accessToken, authorUrn, imageBuffer, contentType = 'image/jpeg') {
+  try {
     const initData = JSON.stringify({
       initializeUploadRequest: {
         owner: authorUrn,
@@ -308,16 +394,15 @@ async function uploadImageToLinkedIn(accessToken, authorUrn, imageSource) {
     const imageUrn = initRes.value?.image;
 
     if (!uploadUrl || !imageUrn) {
-      console.warn('[LinkedIn Image] Initialize image upload fallback:', initRes);
+      console.warn('[LinkedIn REST Image] Initialize image upload fallback:', JSON.stringify(initRes));
       return null;
     }
 
-    // Step 2: PUT image binary to uploadUrl
     await uploadBinary(uploadUrl, imageBuffer, contentType);
-    console.log('[LinkedIn Image] ✅ Image uploaded successfully. URN:', imageUrn);
+    console.log('[LinkedIn REST Image] ✅ Image uploaded successfully. Image URN:', imageUrn);
     return imageUrn;
   } catch (err) {
-    console.warn('[LinkedIn Image] Image upload warning:', err.message);
+    console.warn('[LinkedIn REST Image] Image upload warning:', err.message);
     return null;
   }
 }
@@ -350,9 +435,11 @@ function fetchImageBuffer(url, maxRedirects = 5) {
 function uploadBinary(uploadUrl, buffer, contentType) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(uploadUrl);
+    const isHttps = parsed.protocol === 'https:';
+    const client = isHttps ? https : http;
     const options = {
       hostname: parsed.hostname,
-      port: 443,
+      port: parsed.port || (isHttps ? 443 : 80),
       path: parsed.pathname + parsed.search,
       method: 'PUT',
       headers: {
@@ -361,11 +448,13 @@ function uploadBinary(uploadUrl, buffer, contentType) {
       },
     };
 
-    const req = https.request(options, (res) => {
+    const req = client.request(options, (res) => {
       if (res.statusCode >= 200 && res.statusCode < 300) {
         resolve();
       } else {
-        reject(new Error(`Binary PUT failed HTTP ${res.statusCode}`));
+        let errData = '';
+        res.on('data', c => errData += c);
+        res.on('end', () => reject(new Error(`Binary PUT failed HTTP ${res.statusCode}: ${errData}`)));
       }
     });
 
@@ -396,7 +485,7 @@ function makeHttpsRequest(options, postData) {
 
 /**
  * Publish Post via LinkedIn UGC Posts API or REST API
- * Automatically falls back to personal profile if organization posting fails
+ * Automatically resolves real member URN, uploads attached images, and verifies success
  */
 async function publishPost(content, options = {}) {
   const tokens = db.getTokens();
@@ -407,9 +496,16 @@ async function publishPost(content, options = {}) {
   }
 
   const targetType = options.targetType || settings.targetType || 'person';
-  const personUrn = tokens.profile?.urn || 'urn:li:person:me';
-  let authorUrn = null;
+  let personUrn = tokens.profile?.urn;
+  if (!personUrn || personUrn.endsWith(':me')) {
+    personUrn = await resolveMemberUrn(tokens.accessToken, personUrn);
+    if (tokens.profile && personUrn && !personUrn.endsWith(':me')) {
+      tokens.profile.urn = personUrn;
+      await db.saveTokensAsync(tokens);
+    }
+  }
 
+  let authorUrn = null;
   if (targetType === 'organization') {
     const rawOrg = options.organizationUrn || settings.organizationUrn;
     authorUrn = await resolveOrganizationUrn(tokens.accessToken, rawOrg);
@@ -419,34 +515,50 @@ async function publishPost(content, options = {}) {
     console.log(`[LinkedIn] 👤 Target Author: Personal Profile (${authorUrn})`);
   }
 
-  // Upload image if provided
-  let imageUrn = null;
+  // Check if image upload was requested
   const imageToUpload = options.imageData || options.imageUrl || null;
+  let imageMedia = null;
   if (imageToUpload) {
-    imageUrn = await uploadImageToLinkedIn(tokens.accessToken, authorUrn, imageToUpload);
-  }
-
-  // Try publishing with the chosen author
-  const publishResult = await attemptPublish(tokens.accessToken, authorUrn, content, imageUrn);
-  if (publishResult) return publishResult;
-
-  // If we were targeting an organization and it failed, fall back to personal profile
-  if (targetType === 'organization' && authorUrn !== personUrn) {
-    console.warn(`[LinkedIn] ⚠️ Organization posting failed. Falling back to personal profile: ${personUrn}`);
-    console.warn('[LinkedIn] ℹ️ To post as a Company Page, add the "Community Management" product in your LinkedIn Developer App and request the w_organization_social scope.');
-
-    // Re-upload image under person's URN (LinkedIn requires image owner = post author)
-    let personalImageUrn = null;
-    if (imageToUpload) {
-      personalImageUrn = await uploadImageToLinkedIn(tokens.accessToken, personUrn, imageToUpload);
-    }
-
-    const fallbackResult = await attemptPublish(tokens.accessToken, personUrn, content, personalImageUrn);
-    if (fallbackResult) {
-      fallbackResult.fallbackNote = 'Posted to your personal profile because organization posting requires the w_organization_social permission. Go to LinkedIn Developer App → Products → Community Management to enable it.';
-      return fallbackResult;
+    imageMedia = await loadImageBuffer(imageToUpload);
+    if (!imageMedia) {
+      console.warn('[LinkedIn] ⚠️ Could not fetch or parse image buffer for posting');
     }
   }
+
+  // If user requested image posting:
+  if (imageMedia) {
+    console.log(`[LinkedIn] 🖼️ Image provided (${imageMedia.buffer.length} bytes). Uploading to LinkedIn...`);
+
+    // Pathway 1: UGC Asset API (/v2/assets?action=registerUpload -> /v2/ugcPosts)
+    const ugcAssetUrn = await uploadAssetForUgc(tokens.accessToken, authorUrn, imageMedia.buffer, imageMedia.contentType);
+    if (ugcAssetUrn) {
+      try {
+        console.log(`[LinkedIn] 🚀 Publishing to UGC API with asset: ${ugcAssetUrn}`);
+        return await publishViaUgcApi(tokens.accessToken, authorUrn, content, ugcAssetUrn);
+      } catch (ugcErr) {
+        console.warn('[LinkedIn] UGC API failed with asset:', ugcErr.message);
+      }
+    }
+
+    // Pathway 2: REST Image API (/rest/images?action=initializeUpload -> /rest/posts)
+    const restImageUrn = await uploadImageForRest(tokens.accessToken, authorUrn, imageMedia.buffer, imageMedia.contentType);
+    if (restImageUrn) {
+      try {
+        console.log(`[LinkedIn] 🚀 Publishing to REST API with image: ${restImageUrn}`);
+        return await publishViaRestApi(tokens.accessToken, authorUrn, content, restImageUrn);
+      } catch (restErr) {
+        console.warn('[LinkedIn] REST API failed with image:', restErr.message);
+      }
+    }
+
+    // If both image uploads or publishing attempts failed:
+    console.error('[LinkedIn] ❌ Both UGC and REST image posting pathways failed.');
+    throw new Error('Failed to attach image to LinkedIn post. Image upload to LinkedIn failed. Please check your LinkedIn account permissions.');
+  }
+
+  // Standard Text-Only publishing (when no image was requested)
+  const textResult = await attemptPublish(tokens.accessToken, authorUrn, content, null);
+  if (textResult) return textResult;
 
   throw new Error('LinkedIn publishing failed. Please check your LinkedIn connection and try again.');
 }
@@ -468,7 +580,7 @@ async function attemptPublish(accessToken, authorUrn, content, imageUrn) {
       return restResult;
     } catch (restErr) {
       console.warn('[LinkedIn] REST API also failed:', restErr.message);
-      return null; // Signal that both APIs failed for this author
+      return null;
     }
   }
 }
@@ -579,7 +691,7 @@ function publishViaRestApi(accessToken, authorUrn, text, imageUrn) {
       postPayload.content = {
         media: {
           id: imageUrn,
-          title: 'AI Post Visual',
+          altText: 'AI Post Visual',
         },
       };
     }
@@ -638,6 +750,8 @@ module.exports = {
   getProfileInfo,
   getUserOrganizations,
   resolveOrganizationUrn,
-  uploadImageToLinkedIn,
+  resolveMemberUrn,
+  uploadAssetForUgc,
+  uploadImageForRest,
   publishPost,
 };

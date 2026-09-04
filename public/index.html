@@ -111,9 +111,12 @@
               <h2 class="section-title">Creator Cockpit</h2>
               <p class="section-subtitle">Craft high-impact personal insights with tailored Flux AI visuals.</p>
             </div>
-            <div class="engine-badge-pill" id="current-engine-badge">
-              <span class="engine-dot"></span>
-              <span>Flux AI & Smart Synthesizer</span>
+            <div class="engine-badge-wrap">
+              <button type="button" id="btn-open-gemini-modal" class="engine-badge-pill engine-badge-clickable" title="Configure Google Gemini 2.0 Flash & Imagen 3">
+                <span class="engine-dot" id="engine-status-dot"></span>
+                <span id="engine-status-text">⚡ Connect Gemini API Key (Free)</span>
+                <span class="engine-settings-icon">⚙️</span>
+              </button>
             </div>
           </div>
 
@@ -405,6 +408,18 @@
 
             </div>
 
+            <!-- AI Provenance Transparency Bar -->
+            <div class="generation-provenance-bar" id="generation-provenance-bar">
+              <div class="provenance-item">
+                <span class="provenance-label">✍️ Copy AI:</span>
+                <span id="provenance-text-engine" class="provenance-val">Staff Case Study Engine</span>
+              </div>
+              <div class="provenance-item">
+                <span class="provenance-label">🎨 Visual AI:</span>
+                <span id="provenance-image-engine" class="provenance-val">Flux AI 4K</span>
+              </div>
+            </div>
+
             <!-- Instant Autopilot Trigger Box -->
             <div class="autopilot-test-card">
               <div class="autopilot-test-info">
@@ -562,7 +577,58 @@
       </div>
     </section>
 
-  </main>
+  <!-- ============================================== -->
+  <!-- MODAL: GOOGLE GEMINI & IMAGEN 3 QUICK CONNECT -->
+  <!-- ============================================== -->
+  <div id="modal-gemini" class="modal-overlay hidden">
+    <div class="modal-container">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <div class="modal-icon">✨</div>
+          <div>
+            <h3>Google Gemini 2.0 & Imagen 3</h3>
+            <p class="modal-subtitle">Generate Staff-Engineer depth insights with Gemini 2.0 Flash and 8K visuals with Google Imagen 3.</p>
+          </div>
+        </div>
+        <button type="button" id="btn-close-gemini-modal" class="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="gemini-info-box">
+          <div class="info-row">
+            <span class="info-badge">🧠 Copywriting</span>
+            <span>Google Gemini 2.0 Flash (Staff Engineer / Founder Case Studies)</span>
+          </div>
+          <div class="info-row">
+            <span class="info-badge">🎨 AI Visuals</span>
+            <span>Google Imagen 3 (Photorealistic 8K Studio Renders)</span>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 16px;">
+          <div class="label-with-link">
+            <label class="form-label" for="modal-gemini-key-input">Gemini API Key</label>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="link-small">
+              Get Free Key from Google AI Studio ↗
+            </a>
+          </div>
+          <div class="input-with-toggle">
+            <input type="password" id="modal-gemini-key-input" class="form-control" placeholder="AIzaSy..." autocomplete="off">
+            <button type="button" id="btn-toggle-key-visibility" class="btn-input-accessory" title="Toggle visibility">👁️</button>
+          </div>
+          <span class="form-hint">Stored safely in your browser and automatically attached to post generation requests.</span>
+        </div>
+
+        <div id="gemini-validation-feedback" class="validation-feedback hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="btn-cancel-gemini-modal" class="btn btn-secondary btn-sm">Cancel</button>
+        <button type="button" id="btn-disconnect-gemini" class="btn btn-danger-outline btn-sm hidden">Disconnect Key</button>
+        <button type="button" id="btn-save-gemini-modal" class="btn btn-primary btn-sm">
+          <span>⚡ Verify & Connect Key</span>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Image Lightbox Modal for 8k Inspection -->
   <div id="image-lightbox" class="lightbox-modal hidden">

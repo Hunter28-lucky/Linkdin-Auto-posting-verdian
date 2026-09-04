@@ -73,9 +73,31 @@ function checkUrlAuth() {
   return null;
 }
 
+const GEMINI_KEY_STORAGE = 'postpulse_gemini_key';
+
+function getStoredGeminiKey() {
+  try {
+    return localStorage.getItem(GEMINI_KEY_STORAGE) || '';
+  } catch {
+    return '';
+  }
+}
+
+function setStoredGeminiKey(key) {
+  try {
+    if (key && key.trim()) {
+      localStorage.setItem(GEMINI_KEY_STORAGE, key.trim());
+    } else {
+      localStorage.removeItem(GEMINI_KEY_STORAGE);
+    }
+  } catch (e) {
+    console.warn('Storage write error:', e);
+  }
+}
+
 /**
  * Authenticated API Fetch Wrapper
- * Automatically transmits LinkedIn tokens and profile headers to backend
+ * Automatically transmits LinkedIn tokens, profile headers, and Gemini key to backend
  * (Essential for Vercel Serverless where memory isn't shared across lambdas)
  */
 function apiFetch(url, options = {}) {
@@ -90,6 +112,12 @@ function apiFetch(url, options = {}) {
       headers['x-user-avatar'] = encodeURIComponent(auth.avatar);
     }
   }
+
+  const geminiKey = getStoredGeminiKey();
+  if (geminiKey) {
+    headers['x-gemini-api-key'] = geminiKey;
+  }
+
   return fetch(url, { ...options, headers, credentials: 'include' });
 }
 
@@ -186,6 +214,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initScheduleForm();
   initManualTokenForm();
   initSettingsKey();
+  initGeminiModal();
+  updateEngineBadgeUI();
 
   // 4. Fetch server state and sync
   fetchStatus();
@@ -574,9 +604,10 @@ function initActionButtons() {
     generateBtn.addEventListener('click', async () => {
       const customPrompt = document.getElementById('input-custom-prompt')?.value || '';
       const customImagePrompt = document.getElementById('input-image-prompt')?.value || '';
+      const geminiKey = getStoredGeminiKey();
 
       generateBtn.disabled = true;
-      generateBtn.innerHTML = '<span class="btn-icon">⏳</span> Synthesizing Post & Flux AI Visual...';
+      generateBtn.innerHTML = '<span class="btn-icon">⏳</span> Synthesizing Post & Visual...';
 
       try {
         const res = await apiFetch('/api/posts/generate', {
@@ -589,6 +620,7 @@ function initActionButtons() {
             customImagePrompt,
             style: state.selectedStyle,
             aspectRatio: state.selectedAspectRatio,
+            geminiApiKey: geminiKey,
           }),
         });
 
@@ -604,7 +636,15 @@ function initActionButtons() {
             updateImagePreview(data.imageUrl, data.imagePrompt);
           }
 
-          showToast(`Post & high-def visual generated using ${data.engine}! ✨`, 'success');
+          // Update AI Provenance tags so the user knows exactly which AI generated this
+          const textEngineEl = document.getElementById('provenance-text-engine');
+          if (textEngineEl) textEngineEl.textContent = data.engine || 'Staff Case Study Engine';
+          const imgEngineEl = document.getElementById('provenance-image-engine');
+          if (imgEngineEl) imgEngineEl.textContent = data.imageEngine || 'Flux AI 4K';
+          const overlayPill = document.querySelector('.overlay-pill');
+          if (overlayPill) overlayPill.textContent = `✨ ${data.imageEngine || 'Flux AI 4K'}`;
+
+          showToast(`Post & visual generated using ${data.engine}! ✨`, 'success');
         } else {
           showToast(data.error || 'Generation failed', 'error');
         }
@@ -628,8 +668,11 @@ function initActionButtons() {
         return;
       }
 
+      const hasVisual = !!state.currentImage;
       publishBtn.disabled = true;
-      publishBtn.innerHTML = 'Publishing to Personal Profile... ⏳';
+      publishBtn.innerHTML = hasVisual
+        ? '<span class="btn-icon">⏳</span> Uploading visual & posting to LinkedIn...'
+        : '<span class="btn-icon">⏳</span> Publishing to Personal Profile...';
 
       try {
         const res = await apiFetch('/api/posts/publish-now', {
@@ -645,7 +688,9 @@ function initActionButtons() {
 
         const data = await res.json();
         if (data.success) {
-          showToast('🚀 Successfully published to your Personal LinkedIn Profile!', 'success');
+          showToast(hasVisual
+            ? '🚀 Successfully published to your Personal LinkedIn Profile with attached visual!'
+            : '🚀 Successfully published to your Personal LinkedIn Profile!', 'success');
           fetchHistory();
           fetchStatus();
         } else {
@@ -803,12 +848,167 @@ function initSettingsKey() {
       });
       const data = await res.json();
       if (data.success) {
+        setStoredGeminiKey(key);
+        updateEngineBadgeUI();
         showToast('Gemini API key updated!', 'success');
       }
     } catch (err) {
       showToast(`Error: ${err.message}`, 'error');
     }
   });
+}
+
+function updateEngineBadgeUI() {
+  const badgeBtn = document.getElementById('btn-open-gemini-modal');
+  const label = document.getElementById('engine-status-text');
+  const disconnectBtn = document.getElementById('btn-disconnect-gemini');
+  const modalInput = document.getElementById('modal-gemini-key-input');
+  const settingsInput = document.getElementById('setting-gemini-key');
+
+  const geminiKey = getStoredGeminiKey();
+
+  if (geminiKey) {
+    if (badgeBtn) {
+      badgeBtn.classList.add('active-gemini');
+      badgeBtn.title = 'Google Gemini 2.0 Flash & Imagen 3 Active. Click to manage.';
+    }
+    if (label) label.textContent = '🟢 Gemini 2.0 & Imagen 3 Active';
+    if (disconnectBtn) disconnectBtn.classList.remove('hidden');
+    if (modalInput && !modalInput.value) modalInput.value = geminiKey;
+    if (settingsInput && !settingsInput.value) settingsInput.value = geminiKey;
+  } else {
+    if (badgeBtn) {
+      badgeBtn.classList.remove('active-gemini');
+      badgeBtn.title = 'Click to connect Google Gemini 2.0 & Imagen 3 (Free)';
+    }
+    if (label) label.textContent = '⚡ Connect Gemini API Key (Free)';
+    if (disconnectBtn) disconnectBtn.classList.add('hidden');
+  }
+}
+
+function initGeminiModal() {
+  const openBtn = document.getElementById('btn-open-gemini-modal');
+  const closeBtn = document.getElementById('btn-close-gemini-modal');
+  const cancelBtn = document.getElementById('btn-cancel-gemini-modal');
+  const modal = document.getElementById('modal-gemini');
+  const saveBtn = document.getElementById('btn-save-gemini-modal');
+  const disconnectBtn = document.getElementById('btn-disconnect-gemini');
+  const keyInput = document.getElementById('modal-gemini-key-input');
+  const toggleVisibilityBtn = document.getElementById('btn-toggle-key-visibility');
+  const feedback = document.getElementById('gemini-validation-feedback');
+
+  function openModal() {
+    if (!modal) return;
+    const currentKey = getStoredGeminiKey();
+    if (keyInput) keyInput.value = currentKey;
+    if (feedback) {
+      feedback.classList.add('hidden');
+      feedback.textContent = '';
+      feedback.className = 'validation-feedback hidden';
+    }
+    modal.classList.remove('hidden');
+    updateEngineBadgeUI();
+  }
+
+  function closeModal() {
+    if (modal) modal.classList.add('hidden');
+  }
+
+  if (openBtn) openBtn.addEventListener('click', openModal);
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+  }
+
+  if (toggleVisibilityBtn && keyInput) {
+    toggleVisibilityBtn.addEventListener('click', () => {
+      if (keyInput.type === 'password') {
+        keyInput.type = 'text';
+        toggleVisibilityBtn.textContent = '🙈';
+      } else {
+        keyInput.type = 'password';
+        toggleVisibilityBtn.textContent = '👁️';
+      }
+    });
+  }
+
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async () => {
+      const apiKey = keyInput?.value?.trim();
+      if (!apiKey) {
+        if (feedback) {
+          feedback.className = 'validation-feedback error';
+          feedback.textContent = 'Please enter a valid Google Gemini API key.';
+          feedback.classList.remove('hidden');
+        }
+        return;
+      }
+
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span>Verifying with Google... ⏳</span>';
+      if (feedback) feedback.classList.add('hidden');
+
+      try {
+        const res = await apiFetch('/api/ai/verify-gemini-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          setStoredGeminiKey(apiKey);
+          updateEngineBadgeUI();
+          if (feedback) {
+            feedback.className = 'validation-feedback success';
+            feedback.textContent = '✅ Key verified! Google Gemini 2.0 Flash & Imagen 3 are now active.';
+            feedback.classList.remove('hidden');
+          }
+          showToast('Google Gemini 2.0 Flash & Imagen 3 Connected! ✨', 'success');
+          setTimeout(() => {
+            closeModal();
+          }, 1200);
+        } else {
+          if (feedback) {
+            feedback.className = 'validation-feedback error';
+            feedback.textContent = `❌ Verification failed: ${data.error || 'Invalid API Key'}`;
+            feedback.classList.remove('hidden');
+          }
+        }
+      } catch (err) {
+        if (feedback) {
+          feedback.className = 'validation-feedback error';
+          feedback.textContent = `❌ Network error: ${err.message}`;
+          feedback.classList.remove('hidden');
+        }
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<span>⚡ Verify & Connect Key</span>';
+      }
+    });
+  }
+
+  if (disconnectBtn) {
+    disconnectBtn.addEventListener('click', async () => {
+      setStoredGeminiKey('');
+      if (keyInput) keyInput.value = '';
+      try {
+        await apiFetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ geminiApiKey: '' }),
+        });
+      } catch (e) {
+        console.warn('Disconnect backend sync error:', e);
+      }
+      updateEngineBadgeUI();
+      showToast('Gemini API key disconnected. Using Staff Case Study Engine.', 'info');
+      closeModal();
+    });
+  }
 }
 
 // ==========================================
@@ -825,6 +1025,12 @@ async function fetchStatus() {
     const user = data.user || data.profile || storedAuth;
 
     updateAuthUI(isConnected, user);
+
+    // Sync Gemini API key if present on backend
+    if (data.settings?.geminiApiKey && !getStoredGeminiKey()) {
+      setStoredGeminiKey(data.settings.geminiApiKey);
+      updateEngineBadgeUI();
+    }
 
     // Update disconnect button
     document.getElementById('btn-disconnect')?.addEventListener('click', async () => {

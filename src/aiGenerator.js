@@ -1,168 +1,206 @@
 const https = require('https');
 const db = require('./database');
 
-// Smart high-engagement personal thought-leadership templates across categories
+// Battle-tested, high-signal thought-leadership templates & case studies
 const TEMPLATES_BY_TOPIC = {
   'AI & Automation Trends': [
     {
-      hook: "AI isn't going to replace software engineers, but engineers orchestrating AI systems will replace those who don't.",
-      body: `Here are 4 major shifts happening across engineering and product in 2026:
+      hook: "Autonomous agents fail in production for one simple reason: treating LLMs as deterministic compute rather than probabilistic reasoners.",
+      body: `A year ago, agentic workflows were mostly experimental demos stuck in infinite loops. Today, the battle lines are clear:
 
-1. Automation is transitioning from fragile scripts to autonomous multi-agent systems.
-2. Code review, synthetic testing, and telemetry analysis are becoming AI-first workflows.
-3. Domain depth + prompt precision is now a bigger superpower than raw syntax memorization.
-4. Speed of product iteration matters far more than writing boilerplate from scratch.
+• Monolithic prompts crumble after 3 reasoning steps. Decompose into isolated single-responsibility subagents.
+• Always inject self-healing validation loops—validate schema, detect anomalies, and retry with constrained context.
+• Never trust agent state to fleeting memory; persist checkpoints with idempotent recovery.
 
-The engineers and founders winning today aren't just coding—they are building leverage.`,
-      cta: "How are you incorporating AI tools or autonomous agents into your workflow this week?",
-      tags: ['#ArtificialIntelligence', '#SoftwareEngineering', '#TechTrends', '#FutureOfTech', '#DeveloperTools'],
-      visualPrompt: 'Futuristic glowing AI neural network connected to sleek modern computer terminal, holographic data visualization, cinematic lighting, 8k resolution, minimalist modern tech concept',
+The real engineering bottleneck is no longer model IQ—it's orchestration, state hygiene, and human-in-the-loop controls.`,
+      cta: "What is the single biggest reliability hurdle you have faced when deploying autonomous agents?",
+      tags: ['#AutonomousAgents', '#AIArchitecture', '#MachineLearning', '#SoftwareEngineering', '#TechInnovation'],
+      visualPrompt: 'Futuristic autonomous AI computing core pulsing with luminous sapphire and amber neural conduits, clean monolithic geometric architecture, cinematic 35mm photograph, chiaroscuro studio lighting, 8k, no text',
     },
     {
-      hook: "90% of tech startups are building superficial AI wrappers. The top 10% are building workflows that create defensible value.",
+      hook: "90% of tech startups are building fragile AI wrappers. The top 10% are building proprietary workflows that create defensible data flywheels.",
       body: `There is a massive chasm between adding a chatbot and solving a genuine operational bottleneck.
 
-What actually moves the needle with AI in production:
-• Deep integration with domain data pipelines
-• Deterministic fallback safeguards and evaluation loops
-• Ultra low-latency UX that feels instantaneous
-• Tangible reduction in manual engineering hours
+What actually creates enterprise leverage with generative AI:
+• Deep bidirectional integration with messy domain data pipelines
+• Deterministic fallback safeguards that kick in when latency spikes
+• Sub-200ms user interaction loops that feel completely instantaneous
+• Measurable reduction in manual engineering toil
 
-Don't just plug in an LLM. Design the end-to-end outcome.`,
-      cta: "What's the most impactful AI tool or workflow your team implemented recently?",
-      tags: ['#AI', '#ProductManagement', '#TechLeadership', '#Innovation', '#B2BTech'],
-      visualPrompt: 'Abstract 3D isometric representation of complex data pipelines and automated workflows glowing with cyan and purple neon light, clean glassmorphism, studio lighting',
+Don't just plug in an LLM API. Architect the end-to-end outcome.`,
+      cta: "What is the most impactful AI workflow your engineering team has implemented this quarter?",
+      tags: ['#AI', '#ProductStrategy', '#TechLeadership', '#SystemDesign', '#B2BTech'],
+      visualPrompt: 'Abstract 3D isometric representation of complex data pipelines and automated workflows glowing with cyan and purple neon light, clean glassmorphism, studio lighting, 8k, no text',
     },
     {
-      hook: "Autonomous agents are moving from research papers into production reality faster than most realize.",
-      body: `A year ago, agentic workflows were mostly experimental demos with infinite loops. Today:
+      hook: "AI isn't replacing software engineers. But engineers orchestrating agentic systems are out-shipping entire 20-person departments.",
+      body: `The leverage curve for technical builders in 2026 has gone completely vertical:
 
-• Background subagents run isolated tasks in parallel.
-• Self-healing pipelines detect anomalies and apply targeted patches.
-• Context-aware memory layers persist state across complex multi-step jobs.
+1. Boilerplate code generation is table stakes; the superpower is system modeling and prompt precision.
+2. Code review, synthetic load testing, and telemetry triage are becoming AI-native workflows.
+3. Solo developers can now maintain multi-service architectures that previously required dedicated DevOps teams.
 
-The bottleneck is no longer model intelligence—it's orchestration, reliability, and human-in-the-loop UX.`,
-      cta: "Are you experimenting with autonomous agents in your projects yet? What's your biggest challenge so far?",
-      tags: ['#AutonomousAgents', '#AIArchitecture', '#MachineLearning', '#TechInnovation', '#SoftwareEngineering'],
-      visualPrompt: 'Modern futuristic digital control room with multiple glowing translucent glass screens showing agent workflows and metrics, cyberpunk corporate aesthetic, cinematic depth of field',
+Velocity without architectural discipline is just accelerated technical debt. Build leverage, but protect simplicity.`,
+      cta: "How has your daily development workflow changed with AI coding agents over the past 6 months?",
+      tags: ['#ArtificialIntelligence', '#SoftwareEngineering', '#DeveloperTools', '#FutureOfTech', '#Productivity'],
+      visualPrompt: 'Minimalist clean developer workstation with multiple dark mode code monitors reflecting soft ambient warm amber light, high end Scandinavian design, cinematic depth of field, 8k, no text',
+    },
+    {
+      hook: "We replaced our complex multi-model RAG pipeline with clean prompt caching and slashed inference costs by 74%.",
+      body: `Engineering case study on premature optimization in LLM systems:
+
+• The Mistake: We initially chained 3 separate vector databases, custom rerankers, and an embeddings pipeline for a 50k-token context problem.
+• The Reality: 80% of our latency and 65% of user failure reports came from chunking misalignments.
+• The Pivot: Switched to long-context models with structured prompt caching and deterministic regex guards.
+• The Result: 74% lower compute bill, 400ms faster p99 latency, and near-zero chunking hallucinations.
+
+Sometimes the best architecture is the one that deletes half your moving parts.`,
+      cta: "What is an architectural shortcut or simplification that drastically improved your system's reliability?",
+      tags: ['#SystemArchitecture', '#LLMOps', '#CaseStudy', '#CleanCode', '#TechStrategy'],
+      visualPrompt: 'Minimalist crystalline cube hovering inside an obsidian vacuum chamber with subtle laser refractions, octane render, clean lines, photorealistic, 8k, no text',
     },
   ],
 
   'Software Engineering & Architecture': [
     {
-      hook: "Writing clean code is good. Writing deletable code is legendary.",
-      body: `Over-engineering is the #1 silent killer of high-velocity engineering teams.
+      hook: "Writing clean code is good. Writing easily deletable code is world-class.",
+      body: `Over-engineering is the silent killer of engineering momentum.
 
-Before you build that abstract factory, distributed event queue, or custom cache layer:
+Before designing that distributed event queue, dynamic factory, or custom cache layer:
 • Ask: Will this business requirement still exist in 6 months?
-• Keep modules loosely coupled so they can be completely ripped out in minutes.
-• Write clear tests that document business intent rather than implementation quirks.
-• Prioritize readability and simplicity over clever one-liners.
+• Keep modules loosely coupled so an entire service can be deleted in 1 pull request.
+• Write tests that verify customer-facing contracts rather than internal class implementations.
+• Prioritize simplicity over clever one-liners every single time.
 
-Simplicity is a hard-won architectural feature, not a compromise.`,
+Simplicity is not a beginner shortcut. It is the ultimate engineering achievement.`,
       cta: "What is one architectural rule or principle you never compromise on?",
-      tags: ['#SoftwareEngineering', '#Coding', '#SystemArchitecture', '#CleanCode', '#DevCommunity'],
-      visualPrompt: 'Minimalist clean isometric architectural diagram of modular software blocks connecting seamlessly, blue and silver lighting, sleek tech aesthetic, octane render',
+      tags: ['#SoftwareEngineering', '#SystemDesign', '#CleanCode', '#SystemArchitecture', '#DevCommunity'],
+      visualPrompt: 'Minimalist clean isometric architectural diagram of modular geometric software blocks connecting seamlessly, blue and titanium lighting, sleek tech aesthetic, 8k, no text',
     },
     {
-      hook: "The best system architecture isn't the most complex one—it's the one that lets your team ship fearlessly on a Friday.",
-      body: `After watching dozens of distributed systems collapse under their own weight, here is what actually matters:
+      hook: "Our database CPU hit 100% on a Tuesday night. It wasn't a DDoS attack—it was a single unindexed foreign key in PostgreSQL.",
+      body: `Production war story on high-scale database reliability:
 
-1. Single source of truth for critical state.
-2. Idempotent background jobs that can safely retry without side-effects.
-3. Observability that tells you WHY an error happened in 3 clicks, not 3 hours.
+• Context: Traffic surged 4x during a product launch event. Everything seemed healthy until API response times spiked to 12 seconds.
+• Root Cause: An innocent ORM query executed an unindexed nested sequential scan across 18 million audit log rows on every checkout.
+• The Fix: Added a concurrent composite index and implemented strict connection pooling limits with pgbouncer.
+• Key Takeaway: Never rely on ORM magic in production paths. Always inspect ` + '`EXPLAIN ANALYZE`' + ` on critical endpoints before shipping.`,
+      cta: "What was the most subtle or memorable database bug you have ever debugged in production?",
+      tags: ['#PostgreSQL', '#BackendDevelopment', '#DatabaseDesign', '#DevOps', '#ProductionOutage'],
+      visualPrompt: 'High tech minimalist server rack glowing softly with cyan and amber fiber optic cables, ultra clean futuristic datacenter, cinematic lighting, 8k, no text',
+    },
+    {
+      hook: "The best system architecture isn't the most clever one—it's the one that lets your team ship fearlessly on a Friday afternoon.",
+      body: `After watching dozens of distributed systems collapse under operational weight, here is what actually moves the needle:
+
+1. Single source of truth for all transactional state.
+2. Idempotent background workers that can safely retry without triggering duplicate side-effects.
+3. Structured observability that tells you WHY an error happened in 2 clicks, not 2 hours of grep logs.
 4. Monoliths that evolve into microservices ONLY when organizational boundaries demand it.
 
-Build boring infrastructure. Save your innovation tokens for the actual user experience.`,
-      cta: "What's an architecture decision you made early on that you're still grateful for?",
-      tags: ['#SystemDesign', '#BackendDevelopment', '#DevOps', '#EngineeringCulture', '#CloudComputing'],
-      visualPrompt: 'High tech minimalist server rack glowing softly with cyan fiber optic cables, ultra clean futuristic datacenter, cinematic lighting, 8k',
+Build boring, rock-solid infrastructure. Save your innovation budget for the customer experience.`,
+      cta: "What architectural decision did you make years ago that you still thank yourself for today?",
+      tags: ['#SystemDesign', '#Backend', '#Microservices', '#DevOps', '#EngineeringCulture'],
+      visualPrompt: 'Sleek luxury architectural structure with floating geometric titanium and glass modules, subtle optical light refractions and dark minimalist aesthetics, 8k, no text',
     },
     {
-      hook: "Junior devs write code for the compiler. Senior devs write code for the human who has to debug it at 2 AM.",
-      body: `Technical depth isn't proven by how complex you can make a solution. It's proven by how effortless it is for another engineer to understand, maintain, and extend.
+      hook: "Junior devs write code for the compiler. Senior devs write code for the tired engineer debugging an incident at 3 AM.",
+      body: `Technical depth is never proven by how complicated you can make a solution. It is proven by how effortless it is for another human to understand, maintain, and extend.
 
-3 habits that separate exceptional engineers:
-✓ Writing self-explanatory function and variable names over cryptic abbreviations.
-✓ Explaining the 'Why' in comments, not just the obvious 'What'.
-✓ Treating documentation as a first-class product feature.`,
+3 habits that separate extraordinary engineers:
+✓ Choosing self-explanatory function and variable names over cryptic abbreviations.
+✓ Documenting the 'Why' and the rejected alternatives, not just the obvious 'What'.
+✓ Treating documentation and developer tooling as tier-1 product deliverables.`,
       cta: "What was the single piece of advice that elevated your engineering career the most?",
-      tags: ['#EngineeringMindset', '#SoftwareDevelopment', '#CareerAdvice', '#CleanCode', '#Mentorship'],
-      visualPrompt: 'Cozy modern developer desk setup at night with dark mode code editor on curved ultrawide monitor, ambient warm LED backlighting, aesthetic workspace photography',
+      tags: ['#EngineeringMindset', '#CareerAdvice', '#Mentorship', '#CleanCode', '#SoftwareDevelopment'],
+      visualPrompt: 'Cozy modern developer studio at twilight with warm backlighting, ultra-wide curved screen showing sleek dark-mode editor, minimalist aesthetics, 8k, no text',
     },
   ],
 
   'Tech Leadership & Building': [
     {
-      hook: "You don't need a 50-person team to build a high-leverage tech business in 2026.",
-      body: `The leverage available to solo builders and micro-teams right now is unprecedented:
+      hook: "You don't need a 50-person department to build a high-leverage SaaS product in 2026.",
+      body: `The leverage available to micro-teams and solo technical builders today is staggering:
 
-• Automated deployment and serverless pipelines eliminate Ops overhead.
-• AI coding assistants and agents multiply individual developer output by 5x.
-• Modern APIs handle payments, authentication, and communication out of the box.
+• Serverless edge pipelines and automated CI/CD eliminate dedicated Ops overhead.
+• AI coding agents multiply individual engineering throughput by 4x to 6x.
+• Modular payment, auth, and analytics APIs handle plumbing out of the box.
 
-The competitive moat is no longer sheer headcount. It is speed of insight, taste, and relentless execution.`,
-      cta: "If you had 1 month of uninterrupted focus, what product or tool would you build?",
-      tags: ['#Startups', '#TechLeadership', '#IndieHacker', '#ProductDevelopment', '#BuildingInPublic'],
-      visualPrompt: 'Minimalist glass modern startup office overlooking a futuristic city skyline at twilight, sleek aesthetic, soft neon glow, cinematic depth',
+The primary competitive moat is no longer raw headcount. It is speed of insight, taste, and relentless customer iteration.`,
+      cta: "If you had 30 days of uninterrupted builder flow, what product would you ship?",
+      tags: ['#Startups', '#TechFounders', '#IndieHacker', '#ProductDevelopment', '#BuildingInPublic'],
+      visualPrompt: 'Minimalist glass modern innovation pavilion overlooking a futuristic tech skyline at twilight, sleek aesthetic, soft neon glow, cinematic depth, 8k, no text',
     },
     {
-      hook: "Most product roadmaps fail not because the team lacked talent, but because they solved problems nobody was willing to pay for.",
-      body: `A checklist for tech leaders before committing 3 months of engineering time:
+      hook: "Most product roadmaps fail not because the engineering team lacked talent, but because they solved problems nobody was willing to pay for.",
+      body: `A checklist for tech leaders before committing 6 weeks of engineering sprint cycles:
 
-1. Have you spoken to 10 prospective users who have this exact headache today?
-2. Are they currently paying money or wasting 5+ hours a week solving it manually?
-3. Can you ship an unscalable, ugly prototype in 7 days to validate demand?
+1. Have you spoken directly with 10 prospective customers who actively suffer from this headache today?
+2. Are they currently losing money or wasting 5+ hours a week solving it with manual spreadsheets?
+3. Can you ship an unscalable, scrappy prototype in 5 days to validate genuine willingness to buy?
 
 Validate before you architect. Feedback is the only currency that prevents wasted development cycles.`,
-      cta: "How does your team validate new features before writing the first line of code?",
-      tags: ['#ProductStrategy', '#StartupLessons', '#TechFounders', '#CustomerFeedback', '#Agile'],
-      visualPrompt: 'Futuristic wireframe hologram of a mobile and web application interface floating above a sleek glass desk, cyan and violet lighting, photorealistic',
+      cta: "How does your team validate demand before writing the first line of code?",
+      tags: ['#ProductStrategy', '#StartupLessons', '#TechLeadership', '#CustomerDiscovery', '#Agile'],
+      visualPrompt: 'Futuristic wireframe hologram of an architectural dashboard interface floating above a sleek glass desk, cyan and violet lighting, photorealistic, 8k, no text',
+    },
+    {
+      hook: "The best engineering managers don't manage code. They manage cognitive load and build shields against context switching.",
+      body: `High-performing engineering teams don't burn out from hard technical problems. They burn out from:
+• Ambiguous requirements that shift mid-sprint
+• Endless status meetings that could have been a 3-line asynchronous update
+• Flaky test suites that normalize false alarms
+• Disconnected leadership that measures output by pull request count instead of business value
+
+Protect your team's focus, set clear decision boundaries, and get out of the way.`,
+      cta: "What is the single most effective cultural practice in your engineering organization?",
+      tags: ['#EngineeringLeadership', '#Management', '#TeamCulture', '#Productivity', '#DevOps'],
+      visualPrompt: 'Dramatic architectural glass sanctuary overlooking an expansive tranquil landscape at sunrise, warm cinematic sunlight, minimalist luxury, 8k, no text',
     },
   ],
 
   'Productivity & Deep Work': [
     {
       hook: "You don't need an 80-hour work week. You need 4 hours of ruthless, uninterrupted focus.",
-      body: `Here is how high-performers achieve disproportionate results in less time:
+      body: `How high-impact technical builders achieve disproportionate results in less time:
 
-• Time-box deep work blocks in the morning before opening emails or messaging apps.
-• Say 'No' to meetings without a clear agenda or tangible decision goal.
-• Ruthlessly automate recurring tasks using scripts and AI tools.
-• Work in 90-minute high-intensity sprints followed by real screen breaks.
+• Time-box dedicated deep work blocks in the morning before opening Slack or email.
+• Say 'No' to any meeting without a written agenda and a tangible decision owner.
+• Ruthlessly automate repetitive tasks using custom scripts and AI agents.
+• Work in 90-minute high-intensity cognitive sprints followed by genuine physical screen breaks.
 
-Consistency, focus, and system design beat chaotic hustle every single time.`,
-      cta: "What is your #1 non-negotiable productivity habit during a busy week?",
-      tags: ['#Productivity', '#CareerGrowth', '#DeepWork', '#Focus', '#TimeManagement'],
-      visualPrompt: 'Calm minimalist workspace with sleek notebook, espresso cup, and ambient daylight through a floor-to-ceiling window, Scandinavian design aesthetic, high quality photograph',
+Consistency, focus, and deliberate system design beat chaotic hustle every single time.`,
+      cta: "What is your #1 non-negotiable productivity rule during a demanding work week?",
+      tags: ['#Productivity', '#DeepWork', '#Focus', '#CareerGrowth', '#TimeManagement'],
+      visualPrompt: 'Calm minimalist workspace with sleek notebook, espresso cup, and ambient daylight through a floor-to-ceiling window, Scandinavian design aesthetic, 8k, no text',
     },
     {
-      hook: "Context switching is the single most expensive tax you pay as a knowledge worker.",
-      body: `Every time you check a notification mid-task, it takes an average of 23 minutes to regain deep focus.
+      hook: "Context switching is the single most expensive tax an engineer pays every single day.",
+      body: `Research shows that every unexpected notification or Slack ping takes up to 23 minutes to fully recover deep flow state.
 
-3 rules to reclaim your brain:
-1. Batch all asynchronous replies into two designated 30-minute windows per day.
-2. Close all browser tabs that aren't directly related to the single task at hand.
-3. Keep a physical notepad to dump random thoughts so they don't derail your current flow.`,
-      cta: "How do you protect your focus during high-pressure work days?",
-      tags: ['#Focus', '#ProductivityHacks', '#MentalClarity', '#FlowState', '#WorkSmart'],
-      visualPrompt: 'Abstract artistic visualization of mental clarity and flow state, smooth glowing geometric glass shapes floating in harmony, calming cyan and slate blue tones',
+3 pragmatic rules to reclaim your brain:
+1. Batch all asynchronous communications into two designated 30-minute daily windows.
+2. Close all browser tabs and editor workspaces that aren't strictly relevant to the current task.
+3. Keep an offline scratchpad to capture fleeting ideas without breaking your active focus.`,
+      cta: "How do you protect your focus during high-pressure shipping cycles?",
+      tags: ['#Focus', '#MentalClarity', '#FlowState', '#DeepWork', '#WorkSmart'],
+      visualPrompt: 'Abstract artistic visualization of mental clarity and flow state, smooth glowing geometric glass shapes floating in harmony, calming cyan and slate blue tones, 8k, no text',
     },
   ],
 
   'Future of Technology': [
     {
-      hook: "The next decade won't just be about smarter software—it will be about the seamless convergence of AI, hardware, and autonomous systems.",
-      body: `We are witnessing the early stages of a profound transformation:
+      hook: "The next wave of computing won't just be about larger models—it will be about edge intelligence, local inference, and multi-agent coordination.",
+      body: `We are standing at the threshold of a fundamental architectural shift:
 
-• Edge AI running complex models locally on consumer devices with zero latency.
-• Intelligent agents orchestrating multi-modal workflows across physical and digital tools.
-• Natural language replacing rigid user interfaces as the primary computing paradigm.
+• Local on-device models running sub-50ms inference with zero cloud dependency.
+• Agentic networks negotiating data handoffs using structured protocols rather than human-curated APIs.
+• Intent-driven interfaces replacing static dashboards as the primary interaction model.
 
-The tools we build today are laying the foundation for how humanity creates, collaborates, and solves global challenges.`,
-      cta: "What emerging technology trend are you most bullish on for the next 5 years?",
-      tags: ['#FutureOfTech', '#Innovation', '#EdgeAI', '#EmergingTech', '#TechnologyTrends'],
-      visualPrompt: 'Futuristic cybernetic interface showing human-machine synergy, glowing holographic lines, ultra modern laboratory background, cinematic lighting, 8k resolution',
+The systems we design today are laying the infrastructure for how humanity creates, collaborates, and solves grand challenges.`,
+      cta: "What emerging tech capability are you most excited to build with over the next 24 months?",
+      tags: ['#FutureOfTech', '#EdgeAI', '#EmergingTech', '#Innovation', '#TechnologyTrends'],
+      visualPrompt: 'Futuristic quantum computing crystalline processor hovering in a pristine dark laboratory, intricate superconducting golden wire chandeliers, cinematic lighting, 8k, no text',
     },
   ],
 };
@@ -193,8 +231,8 @@ const IMAGE_STYLES = {
     id: 'workspace',
     name: 'Minimalist Sanctuary',
     icon: '🏛️',
-    description: 'Architectural Digest developer desk sanctuary at blue hour, ambient warm LED strips',
-    suffix: ', Architectural Digest interior photography, ultra-minimalist developer workspace sanctuary at blue hour twilight, ambient warm LED strip backlighting, matte black curved display, polished concrete desk, bonsai, cinematic wide angle, 8k, no text, no letters, no people',
+    description: 'Scandinavian architectural studio, warm amber LED lighting, ultrawide curved monitor',
+    suffix: ', Scandinavian modern architectural developer study, warm ambient amber LED glow, curved ultrawide display on solid walnut floating desk, floor to ceiling glass windows with mountain dusk view, architectural digest photography, 8k, no text, no blur',
   },
   abstract: {
     id: 'abstract',
@@ -217,7 +255,7 @@ function buildVisualSceneConcept(topic, postContent) {
   if (t.includes('ai') || t.includes('agent') || c.includes('agent') || c.includes('llm') || c.includes('model')) {
     return 'Futuristic autonomous AI computing core pulsing with luminous sapphire and amber neural synapses, clean monolithic geometric architecture';
   }
-  if (t.includes('software') || t.includes('architecture') || c.includes('microservice') || c.includes('database') || c.includes('system') || c.includes('code')) {
+  if (t.includes('software') || t.includes('architecture') || c.includes('microservice') || c.includes('database') || c.includes('system') || c.includes('code') || c.includes('postgresql')) {
     return 'Precision-engineered modular architectural framework with interconnecting optical data conduits and polished crystalline modules';
   }
   if (t.includes('leadership') || t.includes('building') || c.includes('founder') || c.includes('startup') || c.includes('scale') || c.includes('product')) {
@@ -274,12 +312,12 @@ async function generateAiImage(imagePrompt, apiKey, options = {}) {
         };
       }
     } catch (err) {
-      console.warn('[AI Image] Google Imagen 3 notice (using Flux fallback):', err.message);
+      console.warn('[AI Image] Google Imagen 3 notice (using Flux 4K fallback):', err.message);
     }
   }
 
   // 2. High-Definition Flux AI Engine
-  console.log(`[AI Image] Generating tailored Flux AI visual (Style: ${styleKey}, Aspect: ${aspectRatio})...`);
+  console.log(`[AI Image] Generating tailored Flux AI 4K visual (Style: ${styleKey}, Aspect: ${aspectRatio})...`);
   const encodedPrompt = encodeURIComponent(cleanPrompt.slice(0, 500));
   const seed = Math.floor(Math.random() * 1000000);
   const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&model=flux&enhance=true&nologo=true&seed=${seed}`;
@@ -287,7 +325,7 @@ async function generateAiImage(imagePrompt, apiKey, options = {}) {
   return {
     imageUrl: pollinationsUrl,
     imagePrompt: cleanPrompt,
-    engine: 'Flux AI',
+    engine: 'Flux AI 4K',
     style: styleKey,
     aspectRatio,
   };
@@ -338,7 +376,7 @@ function generateWithGoogleImagen(promptText, apiKey, aspectRatio = '16:9') {
     });
 
     req.on('error', reject);
-    req.setTimeout(15000, () => {
+    req.setTimeout(20000, () => {
       req.destroy();
       reject(new Error('Google Imagen 3 request timed out'));
     });
@@ -348,27 +386,71 @@ function generateWithGoogleImagen(promptText, apiKey, aspectRatio = '16:9') {
 }
 
 /**
- * Generate Post using Google Gemini Flash API if key available,
- * or smart dynamic template engine, accompanied by tailored AI image.
+ * Test & verify a Google Gemini API Key
  */
-async function generatePost({ topic = 'AI & Automation Trends', tone = 'engaging', customPrompt = '', customImagePrompt = '', style = 'cinematic', aspectRatio = '16:9' }) {
+function verifyGeminiKey(apiKey) {
+  return new Promise((resolve) => {
+    if (!apiKey || !apiKey.trim()) {
+      return resolve({ valid: false, error: 'API key cannot be empty' });
+    }
+    const cleanKey = apiKey.trim();
+    const options = {
+      hostname: 'generativelanguage.googleapis.com',
+      port: 443,
+      path: `/v1beta/models?key=${cleanKey}`,
+      method: 'GET',
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (c) => (data += c));
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (res.statusCode >= 200 && res.statusCode < 300 && parsed.models) {
+            resolve({ valid: true, modelsCount: parsed.models.length });
+          } else {
+            const errDetail = parsed.error?.message || `HTTP ${res.statusCode}: Invalid API Key`;
+            resolve({ valid: false, error: errDetail });
+          }
+        } catch {
+          resolve({ valid: false, error: 'Invalid response from Google Gemini API' });
+        }
+      });
+    });
+
+    req.on('error', (e) => resolve({ valid: false, error: e.message }));
+    req.setTimeout(8000, () => {
+      req.destroy();
+      resolve({ valid: false, error: 'Connection to Google Gemini API timed out' });
+    });
+    req.end();
+  });
+}
+
+/**
+ * Generate Post using Google Gemini API if key available,
+ * or Staff Engineer Case Study Engine, accompanied by tailored AI visual.
+ */
+async function generatePost({ topic = 'AI & Automation Trends', tone = 'engaging', customPrompt = '', customImagePrompt = '', style = 'cinematic', aspectRatio = '16:9', geminiApiKey = '' }) {
   const settings = db.getSettings();
-  const apiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY;
+  const apiKey = geminiApiKey || settings.geminiApiKey || process.env.GEMINI_API_KEY;
 
   let postData = null;
 
   if (apiKey) {
     try {
+      console.log('[AI Generator] Generating thought leadership copy with Google Gemini...');
       postData = await generateWithGemini(apiKey, topic, tone, customPrompt);
     } catch (err) {
-      console.warn('[AI Generator] Gemini API call failed, falling back to smart dynamic generator:', err.message);
+      console.warn('[AI Generator] Gemini API call failed, falling back to Staff Case Study Engine:', err.message);
       postData = generateDynamicTemplate(topic, tone, customPrompt);
     }
   } else {
     postData = generateDynamicTemplate(topic, tone, customPrompt);
   }
 
-  // Construct image prompt with style and generate AI image
+  // Construct image prompt with style and generate AI visual
   const visualPrompt = customImagePrompt || postData.suggestedImagePrompt || createImagePrompt(postData.topic, postData.content, style);
   const imageObj = await generateAiImage(visualPrompt, apiKey, { style, aspectRatio });
 
@@ -383,27 +465,45 @@ async function generatePost({ topic = 'AI & Automation Trends', tone = 'engaging
 }
 
 /**
- * Call Google Gemini Flash API via HTTPS
+ * Call Google Gemini API via HTTPS (Tries Gemini 2.0 Flash first, then 1.5 Flash)
  */
-function generateWithGemini(apiKey, topic, tone, customPrompt) {
+async function generateWithGemini(apiKey, topic, tone, customPrompt) {
+  try {
+    return await callGeminiModel(apiKey, 'gemini-2.0-flash', topic, tone, customPrompt);
+  } catch (err20) {
+    console.warn('[AI Generator] Gemini 2.0 Flash notice, trying Gemini 1.5 Flash fallback:', err20.message);
+    return await callGeminiModel(apiKey, 'gemini-1.5-flash', topic, tone, customPrompt);
+  }
+}
+
+function callGeminiModel(apiKey, modelName, topic, tone, customPrompt) {
   return new Promise((resolve, reject) => {
     const promptInstructions = `
-You are an expert LinkedIn creator, engineer, and tech thought leader posting directly to your personal LinkedIn profile.
+You are a Principal Software Engineer & Tech Founder posting directly to your personal LinkedIn network.
 
 Topic: ${topic}
-Tone: ${tone} (thought-provoking, high-signal, engaging, authentic)
-${customPrompt ? `Custom Topic / Directive: ${customPrompt}` : ''}
+Tone: ${tone} (thought-provoking, battle-tested, high-signal, authentic)
+${customPrompt ? `Specific Angle / Directive / Case Study: ${customPrompt}` : ''}
 
-Strict Rules:
-1. Do NOT write about hiring, recruitment, job openings, sales representative jobs, or commissions.
-2. Craft high-value insights, actionable frameworks, engineering lessons, or future-focused tech analysis.
-3. Formatting Rules:
-   - Start with a compelling, scroll-stopping 1-line hook with 1 relevant emoji.
-   - Use short 1-2 sentence paragraphs for mobile scannability.
-   - Use clean, punchy bullet points (• or numbers).
-   - End with a genuine, thought-provoking question or discussion starter for the audience.
-   - Include 4-6 relevant hashtags at the bottom.
-4. Also output a 1-sentence description of the ideal AI visual concept to accompany this post.
+CRITICAL RULES FOR HIGH-ENGAGEMENT LINKEDIN THOUGHT LEADERSHIP:
+1. NEVER USE ROBOTIC AI FILLER:
+   - BANNED: "In today's fast-paced digital world", "Game-changer", "Let's dive in", "Excited to share", "💡 Thought on", "In this post, I will explain"
+2. Hook Formula (First Line):
+   - Must be an irresistible pattern interrupt, contrarian truth, concrete production metric, or war story.
+   - Examples:
+     - "We spent 3 weeks optimizing our vector search, only to discover our latency bottleneck was a missing PostgreSQL composite index."
+     - "Writing clean code is good. Writing easily deletable code is world-class."
+     - "Autonomous agents fail in production for one reason: treating probabilistic LLMs as deterministic compute."
+3. Structure & Pacing:
+   - 1-2 sentence paragraphs maximum for mobile scannability.
+   - 3-4 bulleted takeaways (• or numbers) packed with actionable technical depth, real architecture trade-offs, or concrete numbers.
+   - A clear, hard-earned takeaway.
+4. Call To Action:
+   - End with a genuinely curious, open-ended question that prompts senior engineers and founders to share their real-world experience in the comments.
+5. Hashtags:
+   - 4-5 focused, relevant tech hashtags at the very bottom.
+6. Visual Concept:
+   - 1-sentence prompt for an AI image generator describing a high-end minimalist 3D visual or cinematic aesthetic to illustrate this post (photorealistic, sleek tech concept, no text, no typography).
 
 Format your response EXACTLY as:
 ---POST---
@@ -420,7 +520,7 @@ Format your response EXACTLY as:
     const options = {
       hostname: 'generativelanguage.googleapis.com',
       port: 443,
-      path: `/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      path: `/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -446,11 +546,13 @@ Format your response EXACTLY as:
                 visualPrompt = (parts[1] || '').trim();
               }
 
+              const engineName = modelName.includes('2.0') ? 'Google Gemini 2.0 Flash' : 'Google Gemini 1.5 Flash';
+
               resolve({
                 content: postContent.trim(),
                 topic,
                 tone,
-                engine: 'Gemini 1.5 Flash',
+                engine: engineName,
                 suggestedImagePrompt: visualPrompt || createImagePrompt(topic, postContent),
               });
               return;
@@ -464,9 +566,9 @@ Format your response EXACTLY as:
     });
 
     req.on('error', (e) => reject(e));
-    req.setTimeout(20000, () => {
+    req.setTimeout(25000, () => {
       req.destroy();
-      reject(new Error('Gemini API request timed out'));
+      reject(new Error(`Gemini ${modelName} request timed out`));
     });
     req.write(requestBody);
     req.end();
@@ -474,7 +576,8 @@ Format your response EXACTLY as:
 }
 
 /**
- * Smart template post builder with variety & dynamic customization
+ * High-Signal Staff Engineer Template Post Builder
+ * Zero robotic prefixes. Seamlessly weaves custom prompt directives into organic hooks.
  */
 function generateDynamicTemplate(topic, tone, customPrompt) {
   const categories = Object.keys(TEMPLATES_BY_TOPIC);
@@ -482,17 +585,27 @@ function generateDynamicTemplate(topic, tone, customPrompt) {
   const list = TEMPLATES_BY_TOPIC[matchedTopic] || TEMPLATES_BY_TOPIC['AI & Automation Trends'];
   const template = list[Math.floor(Math.random() * list.length)];
 
-  let postText = `${template.hook}\n\n${template.body}\n\n${template.cta}\n\n${(template.tags || []).join(' ')}`;
+  let postText = '';
 
-  if (customPrompt) {
-    postText = `💡 Thought on ${customPrompt}:\n\n` + postText;
+  if (customPrompt && customPrompt.trim()) {
+    // Transform custom prompt into a natural, high-converting hook instead of a robotic prefix
+    const cleanPrompt = customPrompt.trim()
+      .replace(/^(thought on|thoughts on|about|regarding|topic:?)\s*/i, '')
+      .replace(/[.:;]+$/, '');
+    const capitalizedPrompt = cleanPrompt.charAt(0).toUpperCase() + cleanPrompt.slice(1);
+
+    // Contextual organic hook
+    const dynamicHook = `${capitalizedPrompt} is fundamentally redefining how engineering teams build and scale in 2026.`;
+    postText = `${dynamicHook}\n\n${template.body}\n\n${template.cta}\n\n${(template.tags || []).join(' ')}`;
+  } else {
+    postText = `${template.hook}\n\n${template.body}\n\n${template.cta}\n\n${(template.tags || []).join(' ')}`;
   }
 
   return {
     content: postText.trim(),
     topic: matchedTopic,
     tone: tone || 'engaging',
-    engine: 'Smart Dynamic Engine',
+    engine: 'Staff Engineer Case Study Engine',
     suggestedImagePrompt: template.visualPrompt || createImagePrompt(matchedTopic, postText),
   };
 }
@@ -501,6 +614,7 @@ module.exports = {
   generatePost,
   generateAiImage,
   createImagePrompt,
+  verifyGeminiKey,
   IMAGE_STYLES,
   TEMPLATES_BY_TOPIC,
 };

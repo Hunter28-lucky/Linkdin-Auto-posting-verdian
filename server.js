@@ -242,7 +242,9 @@ app.get('/api/ai/image-styles', (req, res) => {
 
 app.post('/api/posts/generate', async (req, res) => {
   try {
-    const { topic, tone, customPrompt, customImagePrompt, style, aspectRatio } = req.body;
+    const { topic, tone, customPrompt, customImagePrompt, style, aspectRatio, geminiApiKey } = req.body;
+    const clientKey = geminiApiKey || req.headers['x-gemini-api-key'] || '';
+
     const generated = await aiGenerator.generatePost({
       topic,
       tone,
@@ -250,6 +252,7 @@ app.post('/api/posts/generate', async (req, res) => {
       customImagePrompt,
       style: style || 'cinematic',
       aspectRatio: aspectRatio || '16:9',
+      geminiApiKey: clientKey,
     });
 
     res.json({
@@ -265,9 +268,9 @@ app.post('/api/posts/generate', async (req, res) => {
 // Dedicated endpoint to generate / regenerate tailored AI image
 app.post('/api/ai/generate-image', async (req, res) => {
   try {
-    const { prompt, topic, postContent, style, aspectRatio } = req.body;
+    const { prompt, topic, postContent, style, aspectRatio, geminiApiKey } = req.body;
     const settings = db.getSettings();
-    const apiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY;
+    const apiKey = geminiApiKey || req.headers['x-gemini-api-key'] || settings.geminiApiKey || process.env.GEMINI_API_KEY;
 
     let finalPrompt = prompt;
     if (!finalPrompt || !finalPrompt.trim()) {
@@ -285,6 +288,35 @@ app.post('/api/ai/generate-image', async (req, res) => {
     });
   } catch (err) {
     console.error('[API] AI Image generation error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Endpoint to verify and persist user's Google Gemini API Key
+app.post('/api/ai/verify-gemini-key', async (req, res) => {
+  try {
+    const { apiKey } = req.body;
+    if (!apiKey || !apiKey.trim()) {
+      return res.status(400).json({ success: false, error: 'API key is required.' });
+    }
+
+    const verification = await aiGenerator.verifyGeminiKey(apiKey.trim());
+    if (verification.valid) {
+      // Persist to settings
+      await db.updateSettingsAsync({ geminiApiKey: apiKey.trim() });
+      res.json({
+        success: true,
+        message: 'Google Gemini 2.0 Flash & Imagen 3 connected and verified successfully!',
+        modelsCount: verification.modelsCount,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: verification.error || 'Failed to verify key with Google Gemini API.',
+      });
+    }
+  } catch (err) {
+    console.error('[API] Key verification error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
