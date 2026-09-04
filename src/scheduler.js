@@ -40,16 +40,22 @@ async function executeScheduledRun() {
   try {
     let postToPublish = null;
 
-    // Check if there is an item in the queue
+    // 1. Check if there is an item in the queue first
     const nextQueued = db.popNextQueuedPost();
     if (nextQueued) {
       postToPublish = nextQueued;
       console.log(`[Scheduler] Publishing post from queue: ${postToPublish.id}`);
-    } else if (settings.autopilotMode === 'autopilot') {
-      // Auto-generate fresh post
-      const topics = settings.topics || ['AI & Tech Trends'];
+      // Ensure image is attached if missing
+      if (!postToPublish.imageUrl) {
+        console.log('[Scheduler] Queued post missing image, generating AI visual...');
+        const imagePrompt = aiGenerator.createImagePrompt(postToPublish.topic, postToPublish.content);
+        postToPublish.imageUrl = await aiGenerator.generateAiImage(imagePrompt, settings.geminiApiKey);
+      }
+    } else if (settings.autopilotMode === 'autopilot' || settings.autopilotMode === 'auto-generate') {
+      // Auto-generate fresh post with AI visual
+      const topics = settings.topics || ['AI & Automation Trends', 'Software Engineering & Architecture', 'Productivity & Deep Work'];
       const randomTopic = topics[Math.floor(Math.random() * topics.length)];
-      console.log(`[Scheduler] Autopilot mode: Generating fresh post on topic "${randomTopic}"...`);
+      console.log(`[Scheduler] Autopilot mode: Generating fresh post and AI visual on topic "${randomTopic}"...`);
       const generated = await aiGenerator.generatePost({
         topic: randomTopic,
         tone: settings.defaultTone || 'engaging',
@@ -58,14 +64,18 @@ async function executeScheduledRun() {
         content: generated.content,
         topic: generated.topic,
         tone: generated.tone,
+        imageUrl: generated.imageUrl,
       };
     } else {
       console.log('[Scheduler] Queue is empty and autopilot mode is set to "Queue Review Only". Skipping.');
       return { success: false, reason: 'Queue empty in review mode' };
     }
 
-    // Publish to LinkedIn
-    const result = await linkedin.publishPost(postToPublish.content);
+    // Publish to LinkedIn personal profile with image
+    const result = await linkedin.publishPost(postToPublish.content, {
+      imageUrl: postToPublish.imageUrl,
+      targetType: 'person',
+    });
 
     // Save to history
     db.addToHistory({
@@ -73,6 +83,8 @@ async function executeScheduledRun() {
       topic: postToPublish.topic,
       status: 'success',
       linkedinPostUrn: result.postUrn,
+      authorUrn: result.authorUrn,
+      imageUrl: postToPublish.imageUrl,
     });
 
     console.log(`[Scheduler] ✅ Successfully published daily post to LinkedIn! Post URN: ${result.postUrn}`);

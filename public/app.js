@@ -1,1014 +1,856 @@
 // ==========================================
-// POSTPULSE DASHBOARD APPLICATION LOGIC (VERDIAN EDITION)
+// POSTPULSE STUDIO 2.0 — FRONTEND CLIENT
+// Targeting: Personal LinkedIn Profile
 // ==========================================
 
-let appState = {
+const state = {
   status: null,
   queue: [],
   history: [],
-  currentTopic: 'Hiring Remote Sales',
+  currentTopic: 'AI & Automation Trends',
+  currentTone: 'thought-leadership',
+  selectedStyle: 'cinematic',
+  selectedAspectRatio: '16:9',
+  currentImage: null,
+  currentImagePrompt: '',
   activeTab: 'studio',
-  editingPostId: null,
-  currentTarget: 'organization', // 'organization' | 'person'
-  currentImage: '/assets/veridian-hiring-poster.jpg',
-  organizations: [],
 };
 
-// DOM Elements
-const elements = {
-  // Tabs
-  tabs: document.querySelectorAll('.nav-tab'),
-  tabViews: document.querySelectorAll('.tab-view'),
-  navQueueCount: document.getElementById('nav-queue-count'),
+// Toast notification helper
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
 
-  // Target Destination Badge
-  navTargetBadge: document.getElementById('nav-target-badge'),
-  navTargetIcon: document.getElementById('nav-target-icon'),
-  navTargetName: document.getElementById('nav-target-name'),
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `
+    <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : '⚡'}</span>
+    <span>${message}</span>
+  `;
 
-  // Studio Target Radio Options
-  optTargetOrg: document.getElementById('opt-target-org'),
-  optTargetPerson: document.getElementById('opt-target-person'),
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(20px)';
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
 
-  // Status & Profile
-  connPill: document.getElementById('connection-status-pill'),
-  connLabel: document.getElementById('connection-label'),
-  userHeader: document.getElementById('user-profile-header'),
-  userAvatar: document.getElementById('user-avatar'),
-  userName: document.getElementById('user-name'),
-  tokenDaysLeft: document.getElementById('token-days-left'),
-  btnConnect: document.getElementById('btn-connect-linkedin'),
-  btnDisconnect: document.getElementById('btn-disconnect'),
-  authBanner: document.getElementById('auth-alert-banner'),
+document.addEventListener('DOMContentLoaded', () => {
+  initTabs();
+  initSparks();
+  initTopicChips();
+  initToneSelector();
+  initStyleSelector();
+  initAspectRatioSelector();
+  initPostEditor();
+  initFormattingHelpers();
+  initImageStudio();
+  initActionButtons();
+  initLightbox();
+  initScheduleForm();
+  initManualTokenForm();
+  initSettingsKey();
 
-  // Metrics
-  metricTotalPublished: document.getElementById('metric-total-published'),
-  metricQueueCount: document.getElementById('metric-queue-count'),
-  metricScheduleTime: document.getElementById('metric-schedule-time'),
-  metricScheduleDays: document.getElementById('metric-schedule-days'),
-  toggleScheduler: document.getElementById('toggle-scheduler-active'),
-  schedulerStatusText: document.getElementById('scheduler-status-text'),
+  // Load initial system data
+  fetchStatus();
+  fetchQueue();
+  fetchHistory();
+});
 
-  // Studio Elements
-  topicChips: document.querySelectorAll('.chip'),
-  inputCustomPrompt: document.getElementById('input-custom-prompt'),
-  selectTone: document.getElementById('select-tone'),
-  btnGenerateAi: document.getElementById('btn-generate-ai'),
-  currentEngineBadge: document.getElementById('current-engine-badge'),
-  postEditor: document.getElementById('post-editor'),
-  charCounter: document.getElementById('char-counter'),
-  btnCopyPost: document.getElementById('btn-copy-post'),
-  btnPublishNow: document.getElementById('btn-publish-now'),
-  btnAddToQueue: document.getElementById('btn-add-to-queue'),
+// ==========================================
+// 1. TABS & NAVIGATION
+// ==========================================
+function initTabs() {
+  const tabs = document.querySelectorAll('.nav-tab');
+  const views = document.querySelectorAll('.tab-view');
 
-  // Image Attachment Elements
-  inputFileImage: document.getElementById('input-file-image'),
-  inputImageUrl: document.getElementById('input-image-url'),
-  btnGenAiImage: document.getElementById('btn-gen-ai-image'),
-  btnRemoveImage: document.getElementById('btn-remove-image'),
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      tabs.forEach((t) => t.classList.remove('active'));
+      views.forEach((v) => v.classList.remove('active'));
 
-  // Preview Elements
-  previewAvatar: document.getElementById('preview-avatar'),
-  previewName: document.getElementById('preview-name'),
-  previewDegree: document.getElementById('preview-degree'),
-  previewHeadline: document.getElementById('preview-headline'),
-  previewContent: document.getElementById('preview-content'),
-  previewImageContainer: document.getElementById('preview-image-container'),
-  previewPostImage: document.getElementById('preview-post-image'),
-  previewTargetTag: document.getElementById('preview-target-tag'),
-  btnTriggerCron: document.getElementById('btn-trigger-cron-now'),
+      tab.classList.add('active');
+      const tabKey = tab.dataset.tab;
+      state.activeTab = tabKey;
 
-  // Queue Elements
-  queueContainer: document.getElementById('queue-container'),
-  btnOpenComposeModal: document.getElementById('btn-open-compose-modal'),
-  formScheduleSettings: document.getElementById('form-schedule-settings'),
-  inputScheduleTime: document.getElementById('input-schedule-time'),
-  daysSelector: document.getElementById('days-selector'),
+      const targetView = document.getElementById(`view-${tabKey}`);
+      if (targetView) targetView.classList.add('active');
 
-  // History Elements
-  historyContainer: document.getElementById('history-container'),
-  btnRefreshHistory: document.getElementById('btn-refresh-history'),
+      if (tabKey === 'queue') fetchQueue();
+      if (tabKey === 'history') fetchHistory();
+    });
+  });
+}
 
-  // Settings Elements
-  formTargetSettings: document.getElementById('form-target-settings'),
-  selectTargetType: document.getElementById('select-target-type'),
-  inputOrgName: document.getElementById('input-org-name'),
-  inputOrgUrn: document.getElementById('input-org-urn'),
-  formAiSettings: document.getElementById('form-ai-settings'),
-  inputGeminiKey: document.getElementById('input-gemini-key'),
-  inputTopicsList: document.getElementById('input-topics-list'),
+// ==========================================
+// 2. SPARKS & CUSTOM PROMPT
+// ==========================================
+function initSparks() {
+  const promptInput = document.getElementById('input-custom-prompt');
+  const promptCounter = document.getElementById('prompt-char-count');
+  const clearBtn = document.getElementById('btn-clear-prompt');
 
-  // Modal Elements
-  modalEditor: document.getElementById('modal-post-editor'),
-  modalTitle: document.getElementById('modal-title'),
-  modalClose: document.getElementById('modal-close'),
-  modalBtnCancel: document.getElementById('modal-btn-cancel'),
-  modalBtnSave: document.getElementById('modal-btn-save'),
-  modalPostTopic: document.getElementById('modal-post-topic'),
-  modalPostContent: document.getElementById('modal-post-content'),
-  modalPostImage: document.getElementById('modal-post-image'),
-
-  // Toasts
-  toastContainer: document.getElementById('toast-container'),
-};
-
-/**
- * Universal authenticated API fetch helper
- */
-async function apiFetch(url, options = {}) {
-  const token = localStorage.getItem('postpulse_token');
-  const userUrn = localStorage.getItem('postpulse_urn');
-  const userName = localStorage.getItem('postpulse_name');
-
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(options.headers || {}),
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-    if (userUrn) headers['x-user-urn'] = encodeURIComponent(userUrn);
-    if (userName) headers['x-user-name'] = encodeURIComponent(userName);
+  if (promptInput && promptCounter) {
+    promptInput.addEventListener('input', () => {
+      promptCounter.textContent = `${promptInput.value.length}/300`;
+    });
   }
 
-  return fetch(url, { ...options, headers });
+  if (clearBtn && promptInput) {
+    clearBtn.addEventListener('click', () => {
+      promptInput.value = '';
+      if (promptCounter) promptCounter.textContent = '0/300';
+      promptInput.focus();
+    });
+  }
+
+  document.querySelectorAll('.spark-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const text = chip.dataset.starter;
+      if (promptInput) {
+        promptInput.value = text;
+        if (promptCounter) promptCounter.textContent = `${text.length}/300`;
+        promptInput.focus();
+        showToast('Idea spark applied to prompt!', 'info');
+      }
+    });
+  });
 }
 
 // ==========================================
-// 1. INITIALIZATION & DATA FETCHING
+// 3. TOPICS & TONE
 // ==========================================
-
-async function init() {
-  bindEventListeners();
-  checkUrlParams();
-  await refreshAll();
-
-  // Initial poster preview setup
-  setImageAttachment('/assets/veridian-hiring-poster.jpg');
+function initTopicChips() {
+  const chips = document.querySelectorAll('#topic-chips-container .chip');
+  chips.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      chips.forEach((c) => c.classList.remove('active'));
+      chip.classList.add('active');
+      state.currentTopic = chip.dataset.topic;
+    });
+  });
 }
 
-async function refreshAll() {
-  await fetchStatus();
-  await fetchQueue();
-  await fetchHistory();
+function initToneSelector() {
+  const select = document.getElementById('select-tone');
+  if (select) {
+    select.addEventListener('change', (e) => {
+      state.currentTone = e.target.value;
+    });
+  }
 }
 
+// ==========================================
+// 4. VISUAL STYLES & ASPECT RATIO
+// ==========================================
+function initStyleSelector() {
+  const styleCards = document.querySelectorAll('.visual-styles-grid .style-card');
+  styleCards.forEach((card) => {
+    card.addEventListener('click', () => {
+      styleCards.forEach((c) => c.classList.remove('active'));
+      card.classList.add('active');
+      state.selectedStyle = card.dataset.style;
+      showToast(`Style set to: ${card.querySelector('.style-name').textContent}`, 'info');
+    });
+  });
+}
+
+function initAspectRatioSelector() {
+  const pills = document.querySelectorAll('#aspect-ratio-selector .aspect-pill');
+  pills.forEach((pill) => {
+    pill.addEventListener('click', () => {
+      pills.forEach((p) => p.classList.remove('active'));
+      pill.classList.add('active');
+      state.selectedAspectRatio = pill.dataset.aspect;
+      showToast(`Aspect ratio set to ${state.selectedAspectRatio}`, 'info');
+    });
+  });
+}
+
+// ==========================================
+// 5. POST EDITOR & FORMATTING HELPERS
+// ==========================================
+function initPostEditor() {
+  const editor = document.getElementById('post-editor');
+  const preview = document.getElementById('preview-content');
+  const counter = document.getElementById('char-counter');
+  const progressBar = document.getElementById('length-progress-bar');
+  const qualityText = document.getElementById('length-quality-text');
+
+  if (!editor) return;
+
+  function updateMetrics() {
+    const len = editor.value.length;
+    if (counter) counter.textContent = `${len} characters`;
+
+    if (preview) {
+      if (editor.value.trim()) {
+        // Format hashtags into styled spans
+        const formatted = editor.value
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/(#\w+)/g, '<span style="color: #70b5f9; font-weight:600;">$1</span>')
+          .replace(/\n/g, '<br>');
+        preview.innerHTML = formatted;
+      } else {
+        preview.innerHTML = 'Write or generate your post to preview here...';
+      }
+    }
+
+    if (progressBar) {
+      const pct = Math.min(100, (len / 2000) * 100);
+      progressBar.style.width = `${pct}%`;
+
+      if (len >= 800 && len <= 1400) {
+        progressBar.style.backgroundColor = 'var(--accent-emerald)';
+        if (qualityText) {
+          qualityText.textContent = '🌟 Sweet spot for LinkedIn algorithm (900-1,300 chars)';
+          qualityText.style.color = 'var(--accent-emerald)';
+        }
+      } else if (len > 2200) {
+        progressBar.style.backgroundColor = 'var(--accent-rose)';
+        if (qualityText) {
+          qualityText.textContent = '⚠️ Long post (may be truncated on mobile)';
+          qualityText.style.color = 'var(--accent-rose)';
+        }
+      } else {
+        progressBar.style.backgroundColor = 'var(--accent-indigo)';
+        if (qualityText) {
+          qualityText.textContent = 'Optimal length: 900 - 1,300 chars';
+          qualityText.style.color = 'var(--text-muted)';
+        }
+      }
+    }
+  }
+
+  editor.addEventListener('input', updateMetrics);
+
+  const copyBtn = document.getElementById('btn-copy-post');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      if (!editor.value.trim()) return;
+      navigator.clipboard.writeText(editor.value).then(() => {
+        showToast('Post copied to clipboard! 📋', 'success');
+      });
+    });
+  }
+}
+
+function initFormattingHelpers() {
+  const editor = document.getElementById('post-editor');
+  if (!editor) return;
+
+  // Add Hook
+  document.getElementById('fmt-hook')?.addEventListener('click', () => {
+    const hook = '⚡ Most tech leaders are looking at this backwards:\n\n';
+    editor.value = hook + editor.value;
+    editor.dispatchEvent(new Event('input'));
+    editor.focus();
+    showToast('Hook added to top of post', 'info');
+  });
+
+  // Bulletize
+  document.getElementById('fmt-bullets')?.addEventListener('click', () => {
+    const lines = editor.value.split('\n');
+    const bulleted = lines
+      .map((line) => {
+        const trimmed = line.trim();
+        if (trimmed.length > 0 && !trimmed.startsWith('•') && !trimmed.startsWith('#') && !trimmed.startsWith('⚡')) {
+          return `• ${trimmed}`;
+        }
+        return line;
+      })
+      .join('\n');
+    editor.value = bulleted;
+    editor.dispatchEvent(new Event('input'));
+    showToast('Converted lines to clean bullet points', 'info');
+  });
+
+  // Add CTA
+  document.getElementById('fmt-cta')?.addEventListener('click', () => {
+    const cta = '\n\nWhat has been your experience with this in your architecture or team? Drop your thoughts below 👇';
+    editor.value = editor.value.trim() + cta;
+    editor.dispatchEvent(new Event('input'));
+    showToast('Added discussion CTA question', 'info');
+  });
+
+  // Add Hashtags
+  document.getElementById('fmt-tags')?.addEventListener('click', () => {
+    const tagMap = {
+      'AI & Automation Trends': '#ArtificialIntelligence #MachineLearning #AIAgents #TechInnovation',
+      'Software Engineering & Architecture': '#SoftwareEngineering #SystemDesign #CleanCode #CloudArchitecture',
+      'Tech Leadership & Building': '#TechLeadership #EngineeringManagement #BuildingInPublic #Startups',
+      'Productivity & Deep Work': '#Productivity #DeepWork #SoftwareDeveloper #WorkSmart',
+      'Future of Technology': '#FutureOfTech #QuantumComputing #EmergingTech #Innovation',
+    };
+    const tags = tagMap[state.currentTopic] || '#Technology #Engineering #AI #Innovation';
+    if (!editor.value.includes('#')) {
+      editor.value = editor.value.trim() + '\n\n' + tags;
+      editor.dispatchEvent(new Event('input'));
+      showToast('Appended relevant hashtags', 'info');
+    }
+  });
+}
+
+// ==========================================
+// 6. AI IMAGE STUDIO & PREVIEW
+// ==========================================
+function initImageStudio() {
+  const promptInput = document.getElementById('input-image-prompt');
+  const regenBtn = document.getElementById('btn-regen-ai-image');
+  const fileInput = document.getElementById('input-file-image');
+  const urlInput = document.getElementById('input-image-url');
+  const removeBtn = document.getElementById('btn-remove-image');
+
+  if (regenBtn) {
+    regenBtn.addEventListener('click', async () => {
+      const prompt = promptInput?.value || '';
+      const editor = document.getElementById('post-editor');
+      const postContent = editor?.value || '';
+
+      regenBtn.disabled = true;
+      regenBtn.innerHTML = '<span class="regen-icon">⏳</span> Generating...';
+
+      try {
+        const res = await fetch('/api/ai/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt,
+            topic: state.currentTopic,
+            postContent,
+            style: state.selectedStyle,
+            aspectRatio: state.selectedAspectRatio,
+          }),
+        });
+        const data = await res.json();
+        if (data.success && data.imageUrl) {
+          updateImagePreview(data.imageUrl, data.imagePrompt);
+          showToast(`New ${data.style || ''} visual generated via ${data.engine}! ✨`, 'success');
+        } else {
+          showToast(data.error || 'Failed to regenerate visual', 'error');
+        }
+      } catch (err) {
+        showToast(`Image error: ${err.message}`, 'error');
+      } finally {
+        regenBtn.disabled = false;
+        regenBtn.innerHTML = '<span class="regen-icon">🔄</span> Regenerate';
+      }
+    });
+  }
+
+  // File upload
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        updateImagePreview(event.target.result, file.name);
+        showToast('Custom visual uploaded!', 'success');
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // URL input
+  if (urlInput) {
+    urlInput.addEventListener('change', () => {
+      const url = urlInput.value.trim();
+      if (url.startsWith('http')) {
+        updateImagePreview(url, 'Custom image link');
+        showToast('Custom visual URL applied!', 'success');
+      }
+    });
+  }
+
+  // Remove button
+  if (removeBtn) {
+    removeBtn.addEventListener('click', () => {
+      updateImagePreview(null, '');
+      showToast('Visual removed from post', 'info');
+    });
+  }
+}
+
+function updateImagePreview(imageUrl, promptText) {
+  state.currentImage = imageUrl;
+  state.currentImagePrompt = promptText || '';
+
+  const container = document.getElementById('preview-image-container');
+  const img = document.getElementById('preview-post-image');
+  const promptInput = document.getElementById('input-image-prompt');
+  const removeBtn = document.getElementById('btn-remove-image');
+
+  if (promptInput && promptText) {
+    promptInput.value = promptText;
+  }
+
+  if (imageUrl) {
+    if (img) img.src = imageUrl;
+    if (container) container.classList.remove('hidden');
+    if (removeBtn) removeBtn.classList.remove('hidden');
+  } else {
+    if (img) img.src = '';
+    if (container) container.classList.add('hidden');
+    if (removeBtn) removeBtn.classList.add('hidden');
+  }
+}
+
+// ==========================================
+// 7. LIGHTBOX MODAL FOR 8K VISUALS
+// ==========================================
+function initLightbox() {
+  const lightbox = document.getElementById('image-lightbox');
+  const lightboxImg = document.getElementById('lightbox-img');
+  const downloadLink = document.getElementById('lightbox-download-link');
+  const closeBtn = document.getElementById('btn-close-lightbox');
+  const backdrop = document.getElementById('lightbox-backdrop');
+  const visualWrapper = document.getElementById('visual-img-wrapper');
+
+  function openLightbox() {
+    if (!state.currentImage) return;
+    if (lightboxImg) lightboxImg.src = state.currentImage;
+    if (downloadLink) downloadLink.href = state.currentImage;
+    if (lightbox) lightbox.classList.remove('hidden');
+  }
+
+  function closeLightbox() {
+    if (lightbox) lightbox.classList.add('hidden');
+  }
+
+  if (visualWrapper) visualWrapper.addEventListener('click', openLightbox);
+  if (closeBtn) closeBtn.addEventListener('click', closeLightbox);
+  if (backdrop) backdrop.addEventListener('click', closeLightbox);
+}
+
+// ==========================================
+// 8. PRIMARY ACTIONS (GENERATE & PUBLISH)
+// ==========================================
+function initActionButtons() {
+  const generateBtn = document.getElementById('btn-generate-ai');
+  const publishBtn = document.getElementById('btn-publish-now');
+  const queueBtn = document.getElementById('btn-add-to-queue');
+  const triggerCronBtn = document.getElementById('btn-trigger-cron-now');
+
+  // GENERATE POST & VISUAL
+  if (generateBtn) {
+    generateBtn.addEventListener('click', async () => {
+      const customPrompt = document.getElementById('input-custom-prompt')?.value || '';
+      const customImagePrompt = document.getElementById('input-image-prompt')?.value || '';
+
+      generateBtn.disabled = true;
+      generateBtn.innerHTML = '<span class="btn-icon">⏳</span> Synthesizing Post & Flux AI Visual...';
+
+      try {
+        const res = await fetch('/api/posts/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: state.currentTopic,
+            tone: state.currentTone,
+            customPrompt,
+            customImagePrompt,
+            style: state.selectedStyle,
+            aspectRatio: state.selectedAspectRatio,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          const editor = document.getElementById('post-editor');
+          if (editor) {
+            editor.value = data.content;
+            editor.dispatchEvent(new Event('input'));
+          }
+
+          if (data.imageUrl) {
+            updateImagePreview(data.imageUrl, data.imagePrompt);
+          }
+
+          showToast(`Post & high-def visual generated using ${data.engine}! ✨`, 'success');
+        } else {
+          showToast(data.error || 'Generation failed', 'error');
+        }
+      } catch (err) {
+        showToast(`Generation error: ${err.message}`, 'error');
+      } finally {
+        generateBtn.disabled = false;
+        generateBtn.innerHTML = '<span class="btn-icon">✨</span> Generate Post & AI Visual';
+      }
+    });
+  }
+
+  // PUBLISH TO PERSONAL PROFILE NOW
+  if (publishBtn) {
+    publishBtn.addEventListener('click', async () => {
+      const editor = document.getElementById('post-editor');
+      const content = editor?.value?.trim();
+
+      if (!content) {
+        showToast('Please enter or generate post content before publishing', 'error');
+        return;
+      }
+
+      publishBtn.disabled = true;
+      publishBtn.innerHTML = 'Publishing to Personal Profile... ⏳';
+
+      try {
+        const res = await fetch('/api/posts/publish-now', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content,
+            imageUrl: state.currentImage,
+            topic: state.currentTopic,
+            targetType: 'person',
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          showToast('🚀 Successfully published to your Personal LinkedIn Profile!', 'success');
+          fetchHistory();
+          fetchStatus();
+        } else {
+          showToast(`Publishing failed: ${data.error}`, 'error');
+        }
+      } catch (err) {
+        showToast(`Publish error: ${err.message}`, 'error');
+      } finally {
+        publishBtn.disabled = false;
+        publishBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg> Post to Personal Profile Now';
+      }
+    });
+  }
+
+  // ADD TO QUEUE
+  if (queueBtn) {
+    queueBtn.addEventListener('click', async () => {
+      const editor = document.getElementById('post-editor');
+      const content = editor?.value?.trim();
+
+      if (!content) {
+        showToast('Post content is empty', 'error');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/queue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content,
+            topic: state.currentTopic,
+            tone: state.currentTone,
+            imageUrl: state.currentImage,
+            targetType: 'person',
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          showToast('Added post and visual to schedule queue! 📋', 'success');
+          fetchQueue();
+          fetchStatus();
+        } else {
+          showToast(data.error || 'Failed to queue post', 'error');
+        }
+      } catch (err) {
+        showToast(`Queue error: ${err.message}`, 'error');
+      }
+    });
+  }
+
+  // INSTANT AUTOPILOT TEST
+  if (triggerCronBtn) {
+    triggerCronBtn.addEventListener('click', async () => {
+      triggerCronBtn.disabled = true;
+      triggerCronBtn.textContent = 'Running Autopilot Job...';
+
+      try {
+        const res = await fetch('/api/scheduler/trigger-now', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Daily autopilot run completed & published! 🚀', 'success');
+          fetchHistory();
+          fetchStatus();
+        } else {
+          showToast(`Autopilot run note: ${data.result?.reason || data.error}`, 'info');
+        }
+      } catch (err) {
+        showToast(`Autopilot error: ${err.message}`, 'error');
+      } finally {
+        triggerCronBtn.disabled = false;
+        triggerCronBtn.textContent = 'Trigger Job Now';
+      }
+    });
+  }
+}
+
+// ==========================================
+// 9. SCHEDULE & SETTINGS FORMS
+// ==========================================
+function initScheduleForm() {
+  const form = document.getElementById('form-schedule-settings');
+  if (!form) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const time = document.getElementById('setting-schedule-time')?.value || '09:00';
+    const autopilotMode = document.getElementById('setting-autopilot-mode')?.value || 'autopilot';
+    const days = Array.from(document.querySelectorAll('.days-selector input:checked')).map((cb) => cb.value);
+
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduleTime: time, scheduleDays: days, autopilotMode }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Schedule settings saved successfully! ⏰', 'success');
+        fetchStatus();
+      }
+    } catch (err) {
+      showToast(`Error saving settings: ${err.message}`, 'error');
+    }
+  });
+}
+
+function initManualTokenForm() {
+  const form = document.getElementById('form-manual-token');
+  if (!form) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const token = document.getElementById('manual-access-token')?.value?.trim();
+    if (!token) return;
+
+    try {
+      const res = await fetch('/api/auth/manual-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: token }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('LinkedIn personal profile token saved! ✅', 'success');
+        fetchStatus();
+      } else {
+        showToast(data.error || 'Invalid token', 'error');
+      }
+    } catch (err) {
+      showToast(`Token error: ${err.message}`, 'error');
+    }
+  });
+}
+
+function initSettingsKey() {
+  const saveKeyBtn = document.getElementById('btn-save-gemini-key');
+  if (!saveKeyBtn) return;
+
+  saveKeyBtn.addEventListener('click', async () => {
+    const key = document.getElementById('setting-gemini-key')?.value?.trim();
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ geminiApiKey: key }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('Gemini API key updated!', 'success');
+      }
+    } catch (err) {
+      showToast(`Error: ${err.message}`, 'error');
+    }
+  });
+}
+
+// ==========================================
+// 10. FETCH DATA & RENDER
+// ==========================================
 async function fetchStatus() {
   try {
-    const res = await apiFetch('/api/status');
+    const res = await fetch('/api/status');
     const data = await res.json();
+    state.status = data;
 
-    const localToken = localStorage.getItem('postpulse_token');
-    if (localToken && !data.isConnected) {
-      data.isConnected = true;
-      data.profile = {
-        name: localStorage.getItem('postpulse_name') || 'LinkedIn User',
-        urn: localStorage.getItem('postpulse_urn') || 'urn:li:person:me',
-        picture: localStorage.getItem('postpulse_avatar') || null,
-      };
-      // Resync in background
-      apiFetch('/api/auth/manual-token', {
-        method: 'POST',
-        body: JSON.stringify({
-          accessToken: localToken,
-          personUrn: data.profile.urn,
-          name: data.profile.name,
-        }),
-      }).catch(() => {});
+    // Update Connection Status
+    const connPill = document.getElementById('connection-status-pill');
+    const connLabel = document.getElementById('connection-label');
+    const userHeader = document.getElementById('user-profile-header');
+    const userAvatar = document.getElementById('user-avatar');
+    const userName = document.getElementById('user-name');
+    const btnConnect = document.getElementById('btn-connect-linkedin');
+    const authBanner = document.getElementById('auth-alert-banner');
+    const previewAvatar = document.getElementById('preview-avatar');
+    const previewName = document.getElementById('preview-name');
+
+    if (data.connected && data.user) {
+      if (connPill) {
+        connPill.className = 'status-pill connected';
+        if (connLabel) connLabel.textContent = 'Active Profile';
+      }
+      if (userHeader) userHeader.classList.remove('hidden');
+      if (userAvatar) userAvatar.src = data.user.picture || 'https://ui-avatars.com/api/?name=LinkedIn+User';
+      if (userName) userName.textContent = data.user.name || 'LinkedIn User';
+      if (previewAvatar && data.user.picture) previewAvatar.src = data.user.picture;
+      if (previewName) previewName.textContent = data.user.name || 'LinkedIn User';
+      if (btnConnect) btnConnect.classList.add('hidden');
+      if (authBanner) authBanner.classList.add('hidden');
+    } else {
+      if (connPill) {
+        connPill.className = 'status-pill disconnected';
+        if (connLabel) connLabel.textContent = 'Disconnected';
+      }
+      if (userHeader) userHeader.classList.add('hidden');
+      if (btnConnect) btnConnect.classList.remove('hidden');
+      if (authBanner) authBanner.classList.remove('hidden');
     }
 
-    appState.status = data;
-    renderStatus(data);
-
-    // Auto-detect and populate managed company page ID if connected
-    if (data.isConnected) {
-      loadUserOrganizations();
+    // Update settings tab view
+    const settingsName = document.getElementById('settings-user-name');
+    const settingsAvatar = document.getElementById('settings-user-avatar');
+    if (data.connected && data.user) {
+      if (settingsName) settingsName.textContent = `${data.user.name} (Personal Account)`;
+      if (settingsAvatar) settingsAvatar.src = data.user.picture || 'https://ui-avatars.com/api/?name=LinkedIn+User';
     }
+
+    // Update disconnect button
+    document.getElementById('btn-disconnect')?.addEventListener('click', async () => {
+      if (confirm('Disconnect LinkedIn account?')) {
+        await fetch('/api/auth/disconnect', { method: 'POST' });
+        showToast('LinkedIn account disconnected', 'info');
+        fetchStatus();
+      }
+    });
+
   } catch (err) {
     console.error('Failed to fetch status:', err);
   }
 }
 
-async function loadUserOrganizations() {
-  try {
-    const res = await apiFetch('/api/linkedin/organizations');
-    const data = await res.json();
-    if (data.success && data.organizations && data.organizations.length > 0) {
-      appState.organizations = data.organizations;
-      const primary = data.organizations[0];
-      const quickInput = document.getElementById('input-quick-org-urn');
-      const settingsInput = document.getElementById('input-org-urn');
-
-      if (quickInput && !quickInput.value.trim()) {
-        quickInput.value = primary.id || primary.urn;
-        if (settingsInput) settingsInput.value = primary.id || primary.urn;
-        updateSettingsOnServer({ organizationUrn: primary.id || primary.urn });
-        showToast(`Auto-detected Company Page ID: ${primary.id || primary.urn} 🏢`, 'info');
-      }
-    }
-  } catch (err) {
-    console.warn('Could not auto-fetch organizations:', err);
-  }
-}
-
 async function fetchQueue() {
   try {
-    const res = await apiFetch('/api/queue');
+    const res = await fetch('/api/queue');
     const data = await res.json();
-    appState.queue = data;
-    renderQueue(data);
+    state.queue = data.queue || [];
+
+    const counter = document.getElementById('nav-queue-count');
+    if (counter) counter.textContent = state.queue.length;
+
+    const listContainer = document.getElementById('queue-container');
+    if (!listContainer) return;
+
+    if (state.queue.length === 0) {
+      listContainer.innerHTML = `
+        <div class="studio-card" style="text-align:center; padding: 2.5rem 1rem;">
+          <p style="color: var(--text-secondary); font-size:0.92rem;">Your publishing queue is currently empty.</p>
+          <p style="color: var(--text-muted); font-size:0.8rem; margin-top:0.35rem;">Generate a post in the AI Studio and click "Add to Schedule Queue" to queue it.</p>
+        </div>
+      `;
+      return;
+    }
+
+    listContainer.innerHTML = state.queue
+      .map(
+        (item) => `
+      <div class="queue-item-card">
+        ${item.imageUrl ? `<img src="${item.imageUrl}" class="queue-thumb" alt="Visual" onerror="this.style.display='none'">` : '<div class="queue-thumb" style="background:#131d33; display:flex; align-items:center; justify-content:center; color:#64748b;">No Image</div>'}
+        <div class="queue-info">
+          <span class="queue-topic-badge">${item.topic || 'General'}</span>
+          <p class="queue-snippet">${item.content}</p>
+        </div>
+        <div class="queue-actions">
+          <button class="btn btn-primary btn-sm" onclick="publishQueueItem('${item.id}')">Publish Now</button>
+          <button class="btn btn-outline btn-sm text-danger" onclick="deleteQueueItem('${item.id}')">Delete</button>
+        </div>
+      </div>
+    `
+      )
+      .join('');
   } catch (err) {
     console.error('Failed to fetch queue:', err);
   }
 }
 
+async function publishQueueItem(id) {
+  try {
+    const res = await fetch(`/api/queue/${id}/publish-now`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Post published to Personal Profile! 🚀', 'success');
+      fetchQueue();
+      fetchHistory();
+    } else {
+      showToast(`Publishing failed: ${data.error}`, 'error');
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  }
+}
+
+async function deleteQueueItem(id) {
+  try {
+    const res = await fetch(`/api/queue/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      showToast('Item deleted from queue', 'info');
+      fetchQueue();
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  }
+}
+
 async function fetchHistory() {
   try {
-    const res = await apiFetch('/api/history');
+    const res = await fetch('/api/history');
     const data = await res.json();
-    appState.history = data;
-    renderHistory(data);
+    state.history = data.history || [];
+
+    const tbody = document.getElementById('history-table-body');
+    if (!tbody) return;
+
+    if (state.history.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color: var(--text-muted); padding: 2rem;">No published posts yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = state.history
+      .map(
+        (item) => `
+      <tr>
+        <td>
+          ${item.imageUrl ? `<img src="${item.imageUrl}" class="history-thumb" alt="Visual" onerror="this.style.display='none'">` : '<span style="color:#64748b;">—</span>'}
+        </td>
+        <td style="max-width: 300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+          ${item.content || 'Automated post'}
+        </td>
+        <td><span class="queue-topic-badge">${item.topic || 'General'}</span></td>
+        <td><span style="font-size:0.75rem; color:#6ee7b7;">👤 Personal Profile</span></td>
+        <td style="font-size:0.78rem; color:var(--text-muted);">${item.publishedAt ? new Date(item.publishedAt).toLocaleDateString() + ' ' + new Date(item.publishedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+        <td>
+          <span class="${item.status === 'success' ? 'status-badge-success' : 'status-badge-failed'}">
+            ${item.status === 'success' ? 'Published' : 'Failed'}
+          </span>
+        </td>
+        <td>
+          ${item.linkedinPostUrn ? `<a href="https://www.linkedin.com/feed/update/${item.linkedinPostUrn}" target="_blank" class="btn btn-outline btn-xs">View on LinkedIn ↗</a>` : '—'}
+        </td>
+      </tr>
+    `
+      )
+      .join('');
   } catch (err) {
     console.error('Failed to fetch history:', err);
   }
 }
 
-// ==========================================
-// 2. UI RENDERING
-// ==========================================
-
-function renderStatus(status) {
-  if (!status) return;
-
-  const bannerCode = document.querySelector('#auth-alert-banner code');
-  if (bannerCode) {
-    bannerCode.textContent = `${window.location.origin}/auth/callback`;
-  }
-
-  // Connection Pill & Header
-  if (status.isConnected && status.profile) {
-    elements.connPill.className = 'status-pill connected';
-    elements.connLabel.textContent = 'Connected';
-    elements.authBanner.classList.add('hidden');
-    elements.btnConnect.classList.add('hidden');
-    elements.userHeader.classList.remove('hidden');
-
-    elements.userName.textContent = status.profile.name || 'LinkedIn User';
-
-    if (status.profile.picture) {
-      elements.userAvatar.src = status.profile.picture;
-    } else {
-      elements.userAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(status.profile.name || 'User')}&background=0a66c2&color=fff`;
-    }
-
-    if (status.tokenExpiresAt) {
-      const days = Math.max(0, Math.ceil((new Date(status.tokenExpiresAt) - new Date()) / (1000 * 60 * 60 * 24)));
-      elements.tokenDaysLeft.textContent = `${days} days token active`;
-    } else {
-      elements.tokenDaysLeft.textContent = `Token active`;
-    }
-  } else {
-    elements.connPill.className = 'status-pill disconnected';
-    elements.connLabel.textContent = 'Disconnected';
-    elements.authBanner.classList.remove('hidden');
-    elements.btnConnect.classList.remove('hidden');
-    elements.userHeader.classList.add('hidden');
-  }
-
-  // Target Settings
-  if (status.settings) {
-    appState.currentTarget = status.settings.targetType || 'organization';
-    const orgName = status.settings.organizationName || 'Verdian';
-
-    if (elements.selectTargetType) elements.selectTargetType.value = appState.currentTarget;
-    if (elements.inputOrgName) elements.inputOrgName.value = orgName;
-    if (elements.inputOrgUrn) elements.inputOrgUrn.value = status.settings.organizationUrn || '';
-
-    const quickOrgInput = document.getElementById('input-quick-org-urn');
-    if (quickOrgInput) {
-      // Extract just the numeric ID from a full URN like 'urn:li:organization:117254291'
-      let orgValue = status.settings.organizationUrn || '117254291';
-      orgValue = orgValue.replace(/^urn:li:organization:/, '').trim();
-      quickOrgInput.value = orgValue;
-    }
-
-    updateTargetUI(appState.currentTarget, orgName);
-  }
-
-  // Metrics
-  elements.metricTotalPublished.textContent = status.totalPublished || 0;
-  elements.metricQueueCount.textContent = status.queuedCount || 0;
-  elements.navQueueCount.textContent = status.queuedCount || 0;
-
-  if (status.scheduleTime) {
-    elements.metricScheduleTime.textContent = formatTime12(status.scheduleTime);
-    elements.inputScheduleTime.value = status.scheduleTime;
-  }
-
-  const dayMap = { '1': 'Mon', '2': 'Tue', '3': 'Wed', '4': 'Thu', '5': 'Fri', '6': 'Sat', '0': 'Sun' };
-  if (status.scheduleDays && status.scheduleDays.length) {
-    if (status.scheduleDays.length === 7) {
-      elements.metricScheduleDays.textContent = 'Every Day';
-    } else if (status.scheduleDays.join(',') === '1,2,3,4,5') {
-      elements.metricScheduleDays.textContent = 'Mon - Fri';
-    } else {
-      elements.metricScheduleDays.textContent = status.scheduleDays.map((d) => dayMap[d] || d).join(', ');
-    }
-
-    document.querySelectorAll('input[name="days"]').forEach((cb) => {
-      cb.checked = status.scheduleDays.includes(cb.value);
-    });
-  }
-
-  elements.toggleScheduler.checked = !!status.schedulerActive;
-  elements.schedulerStatusText.textContent = status.schedulerActive
-    ? status.autopilotMode === 'autopilot'
-      ? `Active (Auto-Posting to ${appState.currentTarget === 'organization' ? 'Verdian' : 'Profile'} Daily)`
-      : 'Active (Posts from Queue)'
-    : 'Paused (Automation Inactive)';
-
-  const modeRadio = document.querySelector(`input[name="autopilotMode"][value="${status.autopilotMode || 'autopilot'}"]`);
-  if (modeRadio) modeRadio.checked = true;
-
-  if (status.settings) {
-    if (status.settings.geminiApiKey) {
-      elements.inputGeminiKey.value = status.settings.geminiApiKey;
-      elements.currentEngineBadge.textContent = '⚡ Google Gemini 1.5 Flash';
-    } else {
-      elements.currentEngineBadge.textContent = '⚡ Smart Dynamic Engine';
-    }
-
-    if (status.settings.topics) {
-      elements.inputTopicsList.value = status.settings.topics.join(', ');
-    }
-  }
-}
-
-function updateTargetUI(targetType, orgName = 'Verdian') {
-  if (targetType === 'organization') {
-    elements.navTargetIcon.textContent = '🏢';
-    elements.navTargetName.textContent = `${orgName} (Company Page)`;
-    elements.optTargetOrg.classList.add('active');
-    elements.optTargetPerson.classList.remove('active');
-    document.querySelector('input[name="studioTarget"][value="organization"]').checked = true;
-
-    // Feed Preview as Company
-    elements.previewName.textContent = orgName;
-    elements.previewDegree.textContent = '• Company';
-    elements.previewHeadline.textContent = 'Growth. Digital. Done Right. 🚀';
-    elements.previewAvatar.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=80';
-    elements.previewTargetTag.textContent = `Posting as ${orgName}`;
-  } else {
-    elements.navTargetIcon.textContent = '👤';
-    elements.navTargetName.textContent = 'Personal Profile';
-    elements.optTargetPerson.classList.add('active');
-    elements.optTargetOrg.classList.remove('active');
-    document.querySelector('input[name="studioTarget"][value="person"]').checked = true;
-
-    // Feed Preview as Person
-    const userName = appState.status?.profile?.name || localStorage.getItem('postpulse_name') || 'Your Name';
-    elements.previewName.textContent = userName;
-    elements.previewDegree.textContent = '• 1st';
-    elements.previewHeadline.textContent = 'Building Autonomous Automation & AI Systems 🚀';
-    elements.previewAvatar.src = appState.status?.profile?.picture || localStorage.getItem('postpulse_avatar') || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=0a66c2&color=fff`;
-    elements.previewTargetTag.textContent = `Posting as Personal Profile`;
-  }
-}
-
-function renderQueue(queue) {
-  if (!queue || queue.length === 0) {
-    elements.queueContainer.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">📭</div>
-        <h4>No posts in queue</h4>
-        <p>Your queue is currently empty. In <strong>Auto-Pilot mode</strong>, the system will automatically generate a fresh AI post for Verdian each morning!</p>
-        <button class="btn btn-outline btn-sm mt-3" onclick="document.getElementById('tab-studio').click()">Go to AI Studio</button>
-      </div>
-    `;
-    return;
-  }
-
-  elements.queueContainer.innerHTML = queue
-    .map(
-      (item, idx) => `
-    <div class="queue-item-card" data-id="${item.id}">
-      <div class="queue-item-header">
-        <span class="topic-badge">${escapeHtml(item.topic || 'General')}</span>
-        <span class="queue-time">#${idx + 1} in queue • Added ${formatDateAgo(item.createdAt)}</span>
-      </div>
-      <div class="queue-item-content">${escapeHtml(item.content)}</div>
-      ${item.imageUrl ? `<div class="mb-2"><img src="${escapeHtml(item.imageUrl)}" alt="Media" style="height:70px; border-radius:6px; object-fit:cover;"></div>` : ''}
-      <div class="queue-item-footer">
-        <button class="btn btn-outline btn-sm" onclick="editQueuePost('${item.id}')">✏️ Edit</button>
-        <button class="btn btn-outline btn-sm" onclick="deleteQueuePost('${item.id}')">🗑️ Delete</button>
-        <button class="btn btn-primary btn-sm" onclick="publishQueuePostNow('${item.id}')">🚀 Post Now</button>
-      </div>
-    </div>
-  `
-    )
-    .join('');
-}
-
-function renderHistory(history) {
-  if (!history || history.length === 0) {
-    elements.historyContainer.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">📜</div>
-        <h4>No posts published yet</h4>
-        <p>Posts published manually or through the daily automated scheduler to Verdian will appear here.</p>
-      </div>
-    `;
-    return;
-  }
-
-  elements.historyContainer.innerHTML = history
-    .map(
-      (item) => `
-    <div class="history-item-card">
-      <div class="history-content-col">
-        <div class="history-meta">
-          <span class="status-tag ${item.status}">${item.status.toUpperCase()}</span>
-          <span class="topic-badge">${escapeHtml(item.topic || 'Post')}</span>
-          <span class="queue-time">${new Date(item.publishedAt).toLocaleString()}</span>
-        </div>
-        <div class="history-text">${escapeHtml(item.content)}</div>
-        ${item.imageUrl && item.imageUrl !== 'Attached Image' ? `<div class="mt-2"><img src="${escapeHtml(item.imageUrl)}" alt="Media" style="height:70px; border-radius:6px; object-fit:cover;"></div>` : ''}
-        ${item.error ? `<div class="mt-2 text-danger" style="font-size:0.78rem;">⚠️ ${escapeHtml(item.error)}</div>` : ''}
-      </div>
-      ${
-        item.linkedinPostUrn
-          ? `<div class="history-actions">
-              <a href="https://www.linkedin.com/feed/" target="_blank" rel="noopener" class="btn btn-outline btn-sm">
-                View on LinkedIn ↗
-              </a>
-            </div>`
-          : ''
-      }
-    </div>
-  `
-    )
-    .join('');
-}
-
-// ==========================================
-// 3. EVENT LISTENERS
-// ==========================================
-
-function bindEventListeners() {
-  // Tabs Navigation
-  elements.tabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      elements.tabs.forEach((t) => t.classList.remove('active'));
-      elements.tabViews.forEach((v) => v.classList.remove('active'));
-
-      tab.classList.add('active');
-      const targetView = document.getElementById(`view-${tab.dataset.tab}`);
-      if (targetView) targetView.classList.add('active');
-      appState.activeTab = tab.dataset.tab;
-    });
-  });
-
-  // Target Destination Toggle in Studio
-  document.querySelectorAll('input[name="studioTarget"]').forEach((radio) => {
-    radio.addEventListener('change', (e) => {
-      appState.currentTarget = e.target.value;
-      const orgName = elements.inputOrgName?.value || 'Verdian';
-      updateTargetUI(appState.currentTarget, orgName);
-      updateSettingsOnServer({ targetType: appState.currentTarget });
-    });
-  });
-
-  // Topic Chips
-  elements.topicChips.forEach((chip) => {
-    chip.addEventListener('click', () => {
-      elements.topicChips.forEach((c) => c.classList.remove('active'));
-      chip.classList.add('active');
-      appState.currentTopic = chip.dataset.topic;
-    });
-  });
-
-  // Generate AI Post
-  elements.btnGenerateAi.addEventListener('click', handleGenerateAiPost);
-
-  // Quick Org Input Synchronizer
-  const quickOrgInput = document.getElementById('input-quick-org-urn');
-  if (quickOrgInput) {
-    quickOrgInput.addEventListener('input', () => {
-      const val = quickOrgInput.value.trim();
-      if (elements.inputOrgUrn) elements.inputOrgUrn.value = val;
-      updateSettingsOnServer({ organizationUrn: val });
-    });
-  }
-  const btnQuickHiring = document.getElementById('btn-quick-hiring');
-  if (btnQuickHiring) {
-    btnQuickHiring.addEventListener('click', () => {
-      appState.currentTopic = 'Hiring Remote Sales';
-      elements.topicChips.forEach((c) => {
-        c.classList.toggle('active', c.dataset.topic === 'Hiring Remote Sales');
-      });
-      handleGenerateAiPost();
-    });
-  }
-
-  // Live Text Editor Synchronizer
-  elements.postEditor.addEventListener('input', () => {
-    const text = elements.postEditor.value;
-    elements.charCounter.textContent = `${text.length} characters`;
-    elements.previewContent.textContent = text || 'Your generated post will appear here...';
-  });
-
-  // Image Upload File Input
-  elements.inputFileImage.addEventListener('change', handleImageUploadFile);
-
-  // Image URL Input
-  elements.inputImageUrl.addEventListener('input', () => {
-    const url = elements.inputImageUrl.value.trim();
-    if (url) {
-      setImageAttachment(url);
-    } else {
-      removeImageAttachment();
-    }
-  });
-
-  // AI Visual Idea Button
-  elements.btnGenAiImage.addEventListener('click', () => {
-    const visualUrl = `/assets/veridian-hiring-poster.jpg`;
-    elements.inputImageUrl.value = visualUrl;
-    setImageAttachment(visualUrl);
-    showToast('Veridian poster attached! 🎨', 'success');
-  });
-
-  // Remove Image Button
-  elements.btnRemoveImage.addEventListener('click', removeImageAttachment);
-
-  // Copy Post
-  elements.btnCopyPost.addEventListener('click', () => {
-    const text = elements.postEditor.value;
-    if (!text) return showToast('No content to copy', 'error');
-    navigator.clipboard.writeText(text);
-    showToast('Post copied to clipboard! 📋', 'success');
-  });
-
-  // Publish Post Now
-  elements.btnPublishNow.addEventListener('click', handlePublishNow);
-
-  // Add to Schedule Queue
-  elements.btnAddToQueue.addEventListener('click', handleAddToQueue);
-
-  // Instant Cron Trigger Test
-  elements.btnTriggerCron.addEventListener('click', handleTriggerCronNow);
-
-  // Scheduler Active Switch Toggle
-  elements.toggleScheduler.addEventListener('change', async () => {
-    const active = elements.toggleScheduler.checked;
-    await updateSettingsOnServer({ schedulerActive: active });
-    showToast(active ? 'Daily scheduler activated! ⏰' : 'Daily scheduler paused ⏸️', 'success');
-    await fetchStatus();
-  });
-
-  // Target Settings Form
-  elements.formTargetSettings.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const targetType = elements.selectTargetType.value;
-    const orgName = elements.inputOrgName.value.trim() || 'Verdian';
-    const orgUrn = elements.inputOrgUrn.value.trim();
-
-    await updateSettingsOnServer({
-      targetType,
-      organizationName: orgName,
-      organizationUrn: orgUrn || undefined,
-    });
-
-    appState.currentTarget = targetType;
-    updateTargetUI(targetType, orgName);
-    showToast('Destination settings saved! 🏢', 'success');
-    await fetchStatus();
-  });
-
-  // Schedule Settings Form
-  elements.formScheduleSettings.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const time = elements.inputScheduleTime.value || '09:00';
-    const checkedDays = Array.from(document.querySelectorAll('input[name="days"]:checked')).map((cb) => cb.value);
-    const mode = document.querySelector('input[name="autopilotMode"]:checked')?.value || 'autopilot';
-
-    await updateSettingsOnServer({
-      scheduleTime: time,
-      scheduleDays: checkedDays,
-      autopilotMode: mode,
-    });
-
-    showToast('Schedule settings saved! 🚀', 'success');
-    await fetchStatus();
-  });
-
-  // AI Settings Form
-  elements.formAiSettings.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const key = elements.inputGeminiKey.value.trim();
-    const topicsStr = elements.inputTopicsList.value.trim();
-    const topics = topicsStr ? topicsStr.split(',').map((t) => t.trim()).filter(Boolean) : [];
-
-    await updateSettingsOnServer({
-      geminiApiKey: key,
-      topics: topics.length > 0 ? topics : undefined,
-    });
-
-    showToast('AI Settings updated successfully! 🤖', 'success');
-    await fetchStatus();
-  });
-
-  // Disconnect LinkedIn Button
-  elements.btnDisconnect.addEventListener('click', async () => {
-    if (confirm('Are you sure you want to disconnect your LinkedIn account?')) {
-      localStorage.removeItem('postpulse_token');
-      localStorage.removeItem('postpulse_urn');
-      localStorage.removeItem('postpulse_name');
-      localStorage.removeItem('postpulse_avatar');
-
-      await apiFetch('/api/auth/disconnect', { method: 'POST' });
-      showToast('LinkedIn account disconnected.', 'success');
-      await refreshAll();
-    }
-  });
-
-  // Refresh History
-  elements.btnRefreshHistory.addEventListener('click', async () => {
-    await fetchHistory();
-    showToast('History refreshed', 'success');
-  });
-
-  // Modal actions
-  elements.modalClose.addEventListener('click', closeModal);
-  elements.modalBtnCancel.addEventListener('click', closeModal);
-  elements.modalBtnSave.addEventListener('click', handleSaveModalPost);
-  elements.btnOpenComposeModal.addEventListener('click', () => openModalForCreate());
-}
-
-// ==========================================
-// 4. ACTION HANDLERS
-// ==========================================
-
-function handleImageUploadFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    const dataUrl = event.target.result;
-    setImageAttachment(dataUrl);
-    showToast('Image attached from computer! 📷', 'success');
-  };
-  reader.readAsDataURL(file);
-}
-
-function setImageAttachment(src) {
-  appState.currentImage = src;
-  elements.previewPostImage.src = src;
-  elements.previewImageContainer.classList.remove('hidden');
-  elements.btnRemoveImage.classList.remove('hidden');
-}
-
-function removeImageAttachment() {
-  appState.currentImage = null;
-  elements.previewPostImage.src = '';
-  elements.inputImageUrl.value = '';
-  elements.inputFileImage.value = '';
-  elements.previewImageContainer.classList.add('hidden');
-  elements.btnRemoveImage.classList.add('hidden');
-  showToast('Image removed', 'info');
-}
-
-async function handleGenerateAiPost() {
-  elements.btnGenerateAi.disabled = true;
-  elements.btnGenerateAi.innerHTML = `<span class="btn-icon">⏳</span> Generating engaging post & visual...`;
-
-  try {
-    const res = await apiFetch('/api/posts/generate', {
-      method: 'POST',
-      body: JSON.stringify({
-        topic: appState.currentTopic,
-        tone: elements.selectTone.value,
-        customPrompt: elements.inputCustomPrompt.value.trim(),
-      }),
-    });
-
-    const data = await res.json();
-    if (data.success && data.content) {
-      elements.postEditor.value = data.content;
-      elements.previewContent.textContent = data.content;
-      elements.charCounter.textContent = `${data.content.length} characters`;
-
-      if (data.imageUrl) {
-        elements.inputImageUrl.value = data.imageUrl;
-        setImageAttachment(data.imageUrl);
-      }
-
-      showToast('Post & visual generated! ✨', 'success');
-    } else {
-      showToast(data.error || 'Failed to generate post', 'error');
-    }
-  } catch (err) {
-    showToast(`Error: ${err.message}`, 'error');
-  } finally {
-    elements.btnGenerateAi.disabled = false;
-    elements.btnGenerateAi.innerHTML = `<span class="btn-icon">✨</span> Generate Post & Visual with AI`;
-  }
-}
-
-async function handlePublishNow() {
-  const content = elements.postEditor.value.trim();
-  if (!content) {
-    return showToast('Please write or generate a post first!', 'error');
-  }
-
-  const token = localStorage.getItem('postpulse_token') || appState.status?.profile;
-  if (!appState.status?.isConnected && !token) {
-    return showToast('Please connect your LinkedIn account first (top right).', 'error');
-  }
-
-  let orgUrnInput = document.getElementById('input-quick-org-urn')?.value.trim() || elements.inputOrgUrn?.value.trim();
-  // Strip urn prefix to get just the numeric ID
-  if (orgUrnInput) orgUrnInput = orgUrnInput.replace(/^urn:li:organization:/, '').trim();
-  // Default to Veridian's known Company Page ID
-  if (appState.currentTarget === 'organization' && !orgUrnInput) {
-    orgUrnInput = '117254291';
-  }
-
-  const targetName = appState.currentTarget === 'organization' ? 'Verdian' : 'Personal Profile';
-  elements.btnPublishNow.disabled = true;
-  elements.btnPublishNow.innerHTML = `⏳ Publishing to ${targetName}...`;
-
-  try {
-    const res = await apiFetch('/api/posts/publish-now', {
-      method: 'POST',
-      body: JSON.stringify({
-        content,
-        topic: appState.currentTopic,
-        imageUrl: appState.currentImage && appState.currentImage.startsWith('http') ? appState.currentImage : undefined,
-        imageData: appState.currentImage && appState.currentImage.startsWith('data:') ? appState.currentImage : undefined,
-        attachPoster: appState.currentImage === '/assets/veridian-hiring-poster.jpg',
-        targetType: appState.currentTarget,
-        organizationUrn: orgUrnInput || undefined,
-      }),
-    });
-
-    const data = await res.json();
-    if (data.success) {
-      if (data.fallbackNote) {
-        showToast(`🎉 Post published to your Personal Profile! (Company page posting requires extra LinkedIn permissions)`, 'success');
-      } else {
-        showToast(`🎉 Successfully posted to ${targetName}!`, 'success');
-      }
-      await refreshAll();
-    } else {
-      showToast(`Posting failed: ${data.error}`, 'error');
-    }
-  } catch (err) {
-    showToast(`Error: ${err.message}`, 'error');
-  } finally {
-    elements.btnPublishNow.disabled = false;
-    elements.btnPublishNow.innerHTML = `
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-      Post to LinkedIn Now
-    `;
-  }
-}
-
-async function handleAddToQueue() {
-  const content = elements.postEditor.value.trim();
-  if (!content) {
-    return showToast('Please write or generate a post first!', 'error');
-  }
-
-  try {
-    const res = await apiFetch('/api/queue', {
-      method: 'POST',
-      body: JSON.stringify({
-        content,
-        topic: appState.currentTopic,
-        tone: elements.selectTone.value,
-        imageUrl: appState.currentImage || undefined,
-      }),
-    });
-
-    const data = await res.json();
-    if (data.success) {
-      showToast('Post added to scheduled queue! 📋', 'success');
-      await fetchQueue();
-      await fetchStatus();
-    } else {
-      showToast(data.error || 'Failed to add to queue', 'error');
-    }
-  } catch (err) {
-    showToast(`Error: ${err.message}`, 'error');
-  }
-}
-
-async function handleTriggerCronNow() {
-  elements.btnTriggerCron.disabled = true;
-  elements.btnTriggerCron.textContent = 'Running Job...';
-
-  try {
-    const res = await apiFetch('/api/scheduler/trigger-now', { method: 'POST' });
-    const data = await res.json();
-
-    if (data.success) {
-      showToast('Daily automated job executed for Verdian! 🚀', 'success');
-      await refreshAll();
-    } else {
-      showToast(`Execution finished: ${data.reason || data.error}`, data.error ? 'error' : 'success');
-    }
-  } catch (err) {
-    showToast(`Job failed: ${err.message}`, 'error');
-  } finally {
-    elements.btnTriggerCron.disabled = false;
-    elements.btnTriggerCron.textContent = 'Trigger Job Now';
-  }
-}
-
-// Queue item operations
-window.editQueuePost = function (id) {
-  const item = appState.queue.find((q) => q.id === id);
-  if (!item) return;
-
-  appState.editingPostId = id;
-  elements.modalTitle.textContent = 'Edit Queued Post';
-  elements.modalPostTopic.value = item.topic || '';
-  elements.modalPostContent.value = item.content || '';
-  elements.modalPostImage.value = item.imageUrl || '';
-  elements.modalEditor.classList.remove('hidden');
-};
-
-window.deleteQueuePost = async function (id) {
-  if (!confirm('Are you sure you want to remove this post from queue?')) return;
-  try {
-    await apiFetch(`/api/queue/${id}`, { method: 'DELETE' });
-    showToast('Post removed from queue', 'success');
-    await fetchQueue();
-    await fetchStatus();
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
-};
-
-window.publishQueuePostNow = async function (id) {
-  const item = appState.queue.find((q) => q.id === id);
-  if (!item) return;
-
-  try {
-    const res = await apiFetch('/api/posts/publish-now', {
-      method: 'POST',
-      body: JSON.stringify({
-        content: item.content,
-        topic: item.topic,
-        imageUrl: item.imageUrl,
-        targetType: appState.currentTarget,
-      }),
-    });
-
-    const data = await res.json();
-    if (data.success) {
-      await apiFetch(`/api/queue/${id}`, { method: 'DELETE' });
-      showToast('Queued post published to LinkedIn! 🎉', 'success');
-      await refreshAll();
-    } else {
-      showToast(`Posting failed: ${data.error}`, 'error');
-    }
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
-};
-
-function openModalForCreate() {
-  appState.editingPostId = null;
-  elements.modalTitle.textContent = 'Add Post to Queue';
-  elements.modalPostTopic.value = 'Hiring Remote Sales';
-  elements.modalPostContent.value = '';
-  elements.modalPostImage.value = '/assets/veridian-hiring-poster.jpg';
-  elements.modalEditor.classList.remove('hidden');
-}
-
-function closeModal() {
-  elements.modalEditor.classList.add('hidden');
-  appState.editingPostId = null;
-}
-
-async function handleSaveModalPost() {
-  const topic = elements.modalPostTopic.value.trim() || 'General';
-  const content = elements.modalPostContent.value.trim();
-  const imageUrl = elements.modalPostImage.value.trim() || undefined;
-
-  if (!content) {
-    return showToast('Content cannot be empty', 'error');
-  }
-
-  try {
-    if (appState.editingPostId) {
-      await apiFetch(`/api/queue/${appState.editingPostId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ topic, content, imageUrl }),
-      });
-      showToast('Queued post updated! ✏️', 'success');
-    } else {
-      await apiFetch('/api/queue', {
-        method: 'POST',
-        body: JSON.stringify({ topic, content, imageUrl }),
-      });
-      showToast('Post added to queue! 📋', 'success');
-    }
-
-    closeModal();
-    await fetchQueue();
-    await fetchStatus();
-  } catch (err) {
-    showToast(`Error: ${err.message}`, 'error');
-  }
-}
-
-async function updateSettingsOnServer(newSettings) {
-  try {
-    const res = await apiFetch('/api/settings', {
-      method: 'POST',
-      body: JSON.stringify(newSettings),
-    });
-    return await res.json();
-  } catch (err) {
-    console.error('Failed to update settings:', err);
-  }
-}
-
-// ==========================================
-// 5. TOAST & HELPER FUNCTIONS
-// ==========================================
-
-function showToast(message, type = 'info') {
-  const toast = document.createElement('div');
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `
-    <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
-    <span>${escapeHtml(message)}</span>
-  `;
-  elements.toastContainer.appendChild(toast);
-
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateY(12px)';
-    setTimeout(() => toast.remove(), 250);
-  }, 4000);
-}
-
-function checkUrlParams() {
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('connected') === 'true') {
-    const token = urlParams.get('token');
-    const name = urlParams.get('name');
-    const urn = urlParams.get('urn');
-    const avatar = urlParams.get('avatar');
-
-    if (token) {
-      localStorage.setItem('postpulse_token', token);
-      if (name) localStorage.setItem('postpulse_name', name);
-      if (urn) localStorage.setItem('postpulse_urn', urn);
-      if (avatar) localStorage.setItem('postpulse_avatar', avatar);
-    }
-
-    showToast('LinkedIn account successfully connected! 🚀', 'success');
-    window.history.replaceState({}, document.title, '/');
-  } else if (urlParams.get('auth_error')) {
-    showToast(`LinkedIn Auth Error: ${urlParams.get('auth_error')}`, 'error');
-    window.history.replaceState({}, document.title, '/');
-  }
-}
-
-function formatTime12(time24) {
-  if (!time24) return '09:00 AM';
-  const [h, m] = time24.split(':').map(Number);
-  const period = h >= 12 ? 'PM' : 'AM';
-  const hour12 = h % 12 || 12;
-  const padMin = String(m).padStart(2, '0');
-  return `${hour12}:${padMin} ${period}`;
-}
-
-function formatDateAgo(iso) {
-  if (!iso) return '';
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-document.addEventListener('DOMContentLoaded', init);
+// Make functions accessible globally for inline onclick
+window.publishQueueItem = publishQueueItem;
+window.deleteQueueItem = deleteQueueItem;

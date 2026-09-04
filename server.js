@@ -199,6 +199,16 @@ app.get('/api/linkedin/organizations', async (req, res) => {
 // 2. DASHBOARD & STATUS APIS
 // ==========================================
 
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    version: '2.0.0',
+    app: 'PostPulse Personal AI Studio',
+    target: 'Personal LinkedIn Profile',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get('/api/status', (req, res) => {
   const stats = db.getStats();
   const settings = db.getSettings();
@@ -212,18 +222,58 @@ app.get('/api/status', (req, res) => {
 // 3. AI POST GENERATOR APIS
 // ==========================================
 
+app.get('/api/ai/image-styles', (req, res) => {
+  res.json({
+    success: true,
+    styles: aiGenerator.IMAGE_STYLES,
+  });
+});
+
 app.post('/api/posts/generate', async (req, res) => {
   try {
-    const { topic, tone, customPrompt } = req.body;
-    const generated = await aiGenerator.generatePost({ topic, tone, customPrompt });
-    const imageConcept = aiGenerator.generateImageConcept(topic, generated.content);
+    const { topic, tone, customPrompt, customImagePrompt, style, aspectRatio } = req.body;
+    const generated = await aiGenerator.generatePost({
+      topic,
+      tone,
+      customPrompt,
+      customImagePrompt,
+      style: style || 'cinematic',
+      aspectRatio: aspectRatio || '16:9',
+    });
 
     res.json({
       success: true,
       ...generated,
-      imageUrl: generated.imageUrl || imageConcept,
     });
   } catch (err) {
+    console.error('[API] Generation error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Dedicated endpoint to generate / regenerate tailored AI image
+app.post('/api/ai/generate-image', async (req, res) => {
+  try {
+    const { prompt, topic, postContent, style, aspectRatio } = req.body;
+    const settings = db.getSettings();
+    const apiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY;
+
+    let finalPrompt = prompt;
+    if (!finalPrompt || !finalPrompt.trim()) {
+      finalPrompt = aiGenerator.createImagePrompt(topic || 'Technology', postContent || '', style || 'cinematic');
+    }
+
+    const imageResult = await aiGenerator.generateAiImage(finalPrompt.trim(), apiKey, {
+      style: style || 'cinematic',
+      aspectRatio: aspectRatio || '16:9',
+    });
+
+    res.json({
+      success: true,
+      ...imageResult,
+    });
+  } catch (err) {
+    console.error('[API] AI Image generation error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });

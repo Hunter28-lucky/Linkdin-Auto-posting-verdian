@@ -320,15 +320,28 @@ async function uploadImageToLinkedIn(accessToken, authorUrn, imageSource) {
   }
 }
 
-function fetchImageBuffer(url) {
+function fetchImageBuffer(url, maxRedirects = 5) {
   return new Promise((resolve, reject) => {
+    if (maxRedirects <= 0) return reject(new Error('Too many redirects while fetching image'));
     const client = url.startsWith('https') ? https : http;
-    client.get(url, (res) => {
+    const req = client.get(url, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        const redirectUrl = new URL(res.headers.location, url).href;
+        return resolve(fetchImageBuffer(redirectUrl, maxRedirects - 1));
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        return reject(new Error(`Failed to fetch image HTTP ${res.statusCode}`));
+      }
       const chunks = [];
       res.on('data', (c) => chunks.push(c));
       res.on('end', () => resolve(Buffer.concat(chunks)));
       res.on('error', reject);
-    }).on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(20000, () => {
+      req.destroy();
+      reject(new Error('Timeout while fetching remote image'));
+    });
   });
 }
 
@@ -391,7 +404,7 @@ async function publishPost(content, options = {}) {
     throw new Error('LinkedIn account is not connected. Please connect your account first.');
   }
 
-  const targetType = options.targetType || settings.targetType || 'organization';
+  const targetType = options.targetType || settings.targetType || 'person';
   const personUrn = tokens.profile?.urn || 'urn:li:person:me';
   let authorUrn = null;
 
@@ -401,12 +414,12 @@ async function publishPost(content, options = {}) {
     console.log(`[LinkedIn] 🏢 Target Author: ${authorUrn}`);
   } else {
     authorUrn = personUrn;
-    console.log(`[LinkedIn] 👤 Target Author: ${authorUrn}`);
+    console.log(`[LinkedIn] 👤 Target Author: Personal Profile (${authorUrn})`);
   }
 
   // Upload image if provided
   let imageUrn = null;
-  const imageToUpload = options.imageData || options.imageUrl || (options.attachPoster ? '/assets/veridian-hiring-poster.jpg' : null);
+  const imageToUpload = options.imageData || options.imageUrl || null;
   if (imageToUpload) {
     imageUrn = await uploadImageToLinkedIn(tokens.accessToken, authorUrn, imageToUpload);
   }
@@ -474,7 +487,7 @@ function publishViaUgcApi(accessToken, authorUrn, text, imageUrn) {
           status: 'READY',
           media: imageUrn,
           title: {
-            text: 'Veridian Post Visual',
+            text: 'AI Post Visual',
           },
         },
       ];
@@ -564,7 +577,7 @@ function publishViaRestApi(accessToken, authorUrn, text, imageUrn) {
       postPayload.content = {
         media: {
           id: imageUrn,
-          title: 'Veridian Post Visual',
+          title: 'AI Post Visual',
         },
       };
     }

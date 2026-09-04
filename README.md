@@ -1,6 +1,13 @@
-# 🚀 PostPulse — Automated Daily LinkedIn Poster (Vercel Ready)
+# 🚀 PostPulse — Personal LinkedIn AI Post Studio & Daily Poster (Vercel Ready)
 
-A production-ready automated daily LinkedIn posting system with AI content generation, automated daily cron scheduling, live feed preview, and a modern dashboard.
+A production-ready automated LinkedIn personal thought-leadership system featuring an **interactive AI Post Studio**, automated AI visual generation (Google Imagen 3 / Pollinations Flux AI), automated daily cron scheduling, live LinkedIn feed preview, and a modern dashboard.
+
+### ✨ Key Features:
+- **Personal Profile Exclusivity**: Posts directly to your personal LinkedIn profile (`urn:li:person`) with personal author tags and feed preview.
+- **Interactive AI Post Studio**: Input custom prompts or choose high-signal 1-click prompt starters (*Architecture Rules, AI Agent Shifts, Building in Public, Deep Work Habits*). Zero hiring/recruitment templates.
+- **Automated AI Visuals for Every Post**: Every post is automatically generated with a high-definition, conceptual AI visual matching the post theme.
+- **AI Image Studio**: Regenerate visuals on-the-fly with custom visual prompts, upload your own assets, or paste image links.
+- **Vercel Cron & Local Scheduler**: Set and forget with autopilot daily runs or schedule queued drafts.
 
 ---
 

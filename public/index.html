@@ -3,75 +3,79 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PostPulse — Automated LinkedIn Poster (Verdian)</title>
+  <title>PostPulse — Personal LinkedIn AI Post Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="dark-theme">
-  <!-- Top Navigation -->
+  <!-- Top Navigation Header -->
   <header class="top-nav">
     <div class="nav-left">
       <div class="brand-logo">
         <div class="logo-icon">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.49 1.49 0 1 0 0-2.98 1.49 1.49 0 0 0 0 2.98m1.4 9.74v-8.37H5.06v8.37z" fill="currentColor"/>
           </svg>
         </div>
         <div class="brand-text">
           <span class="brand-name">PostPulse</span>
-          <span class="brand-badge">Verdian AutoPilot</span>
+          <span class="brand-badge">Studio 2.0</span>
         </div>
       </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="nav-tabs" role="tablist">
+        <button class="nav-tab active" data-tab="studio" id="tab-studio">
+          <span class="tab-icon">✨</span> Studio
+        </button>
+        <button class="nav-tab" data-tab="queue" id="tab-queue">
+          <span class="tab-icon">📋</span> Queue
+          <span class="badge-counter" id="nav-queue-count">0</span>
+        </button>
+        <button class="nav-tab" data-tab="history" id="tab-history">
+          <span class="tab-icon">📜</span> History
+        </button>
+        <button class="nav-tab" data-tab="settings" id="tab-settings">
+          <span class="tab-icon">⚙️</span> Settings
+        </button>
+      </nav>
     </div>
 
-    <!-- Navigation Tabs -->
-    <nav class="nav-tabs" role="tablist">
-      <button class="nav-tab active" data-tab="studio" id="tab-studio">
-        <span class="tab-icon">✨</span> AI Studio
-      </button>
-      <button class="nav-tab" data-tab="queue" id="tab-queue">
-        <span class="tab-icon">📋</span> Queue & Schedule
-        <span class="badge-counter" id="nav-queue-count">0</span>
-      </button>
-      <button class="nav-tab" data-tab="history" id="tab-history">
-        <span class="tab-icon">📜</span> History
-      </button>
-      <button class="nav-tab" data-tab="settings" id="tab-settings">
-        <span class="tab-icon">⚙️</span> Settings
-      </button>
-    </nav>
-
-    <!-- Account & Destination Badge -->
+    <!-- Top Navigation Right -->
     <div class="nav-right">
-      <!-- Target Posting Destination Badge -->
-      <div class="target-badge" id="nav-target-badge" title="Target page for automatic and manual posts">
-        <span class="target-icon" id="nav-target-icon">🏢</span>
+      <!-- Personal Profile Destination Badge -->
+      <div class="target-badge" id="nav-target-badge" title="All posts are published exclusively to your Personal LinkedIn Profile">
+        <span class="target-dot"></span>
+        <span class="target-icon">👤</span>
         <div class="target-meta">
-          <span class="target-small">Target Page</span>
-          <span class="target-name" id="nav-target-name">Verdian (Company Page)</span>
+          <span class="target-name">Personal Profile</span>
         </div>
+        <span class="locked-icon" title="Locked to Personal Profile">🔒</span>
       </div>
 
+      <!-- Live Connection Pill -->
       <div id="connection-status-pill" class="status-pill disconnected">
         <span class="ping-dot"></span>
         <span id="connection-label">Disconnected</span>
       </div>
 
+      <!-- Connected Profile Details -->
       <div id="user-profile-header" class="user-header-card hidden">
         <img id="user-avatar" src="" alt="Avatar" class="user-avatar" />
         <div class="user-info">
           <span id="user-name" class="user-name">LinkedIn User</span>
-          <span id="token-days-left" class="token-expiry">60 days active</span>
+          <span id="token-days-left" class="token-expiry">Active</span>
         </div>
         <button id="btn-disconnect" class="btn-icon" title="Disconnect Account">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
         </button>
       </div>
 
+      <!-- Connect Button -->
       <a id="btn-connect-linkedin" href="/auth/linkedin" class="btn btn-primary btn-sm">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.49 1.49 0 1 0 0-2.98 1.49 1.49 0 0 0 0 2.98m1.4 9.74v-8.37H5.06v8.37z"/></svg>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.49 1.49 0 1 0 0-2.98 1.49 1.49 0 0 0 0 2.98m1.4 9.74v-8.37H5.06v8.37z"/></svg>
         Connect LinkedIn
       </a>
     </div>
@@ -79,251 +83,337 @@
 
   <!-- Main Container -->
   <main class="main-content">
-    
-    <!-- Connection Alert Banner if not connected -->
+
+    <!-- Auth Alert Banner (visible when not connected) -->
     <section id="auth-alert-banner" class="alert-banner warning">
       <div class="alert-icon">⚡</div>
       <div class="alert-content">
-        <h4>Connect your LinkedIn account to enable automated posting for Verdian</h4>
-        <p>Ensure your developer app has <code>https://linkdinautopostingverdian.vercel.app/auth/callback</code> in Redirect URLs and access to <strong>Share on LinkedIn</strong>.</p>
+        <h4>Connect your LinkedIn account to publish directly to your Personal Profile</h4>
+        <p>PostPulse automates high-signal thought leadership posts and AI visuals straight to your feed.</p>
       </div>
       <div class="alert-actions">
-        <a href="/auth/linkedin" class="btn btn-warning btn-sm">Connect Now</a>
-      </div>
-    </section>
-
-    <!-- Top Metrics Ribbon -->
-    <section class="metrics-ribbon">
-      <div class="metric-card">
-        <div class="metric-icon blue">🚀</div>
-        <div class="metric-body">
-          <span class="metric-value" id="metric-total-published">0</span>
-          <span class="metric-label">Published Posts</span>
-        </div>
-      </div>
-
-      <div class="metric-card">
-        <div class="metric-icon purple">📋</div>
-        <div class="metric-body">
-          <span class="metric-value" id="metric-queue-count">0</span>
-          <span class="metric-label">Posts in Queue</span>
-        </div>
-      </div>
-
-      <div class="metric-card">
-        <div class="metric-icon green">⏰</div>
-        <div class="metric-body">
-          <span class="metric-value" id="metric-schedule-time">09:00 AM</span>
-          <span class="metric-label" id="metric-schedule-days">Mon - Fri</span>
-        </div>
-      </div>
-
-      <div class="metric-card toggle-card">
-        <div class="metric-body">
-          <div class="flex-between">
-            <span class="metric-label">Verdian Auto-Pilot</span>
-            <label class="switch">
-              <input type="checkbox" id="toggle-scheduler-active" checked>
-              <span class="slider round"></span>
-            </label>
-          </div>
-          <span class="metric-sublabel" id="scheduler-status-text">Active (Auto-Generates & Posts Daily)</span>
-        </div>
+        <a href="/auth/linkedin" class="btn btn-warning btn-sm">Connect Profile Now</a>
       </div>
     </section>
 
     <!-- ============================================== -->
-    <!-- TAB 1: AI POST STUDIO -->
+    <!-- TAB 1: AI POST STUDIO (MAIN COCKPIT) -->
     <!-- ============================================== -->
     <section id="view-studio" class="tab-view active">
-      <div class="studio-grid">
+      <div class="studio-layout">
         
-        <!-- Left: AI Controls & Composer -->
-        <div class="studio-panel composer-panel">
-          <div class="panel-header">
-            <h3><span class="gradient-text">AI Post Studio</span></h3>
-            <span class="engine-badge" id="current-engine-badge">⚡ Gemini / Smart Engine</span>
+        <!-- Left Column: Creator Studio Cockpit -->
+        <div class="studio-composer">
+          
+          <!-- Cockpit Header -->
+          <div class="composer-header">
+            <div>
+              <h2 class="section-title">Creator Cockpit</h2>
+              <p class="section-subtitle">Craft high-impact personal insights with tailored Flux AI visuals.</p>
+            </div>
+            <div class="engine-badge-pill" id="current-engine-badge">
+              <span class="engine-dot"></span>
+              <span>Flux AI & Smart Synthesizer</span>
+            </div>
           </div>
 
-          <!-- Target Entity Selector -->
-          <div class="form-group target-selector-group">
-            <div class="flex-between mb-1">
-              <label class="form-label mb-0">Post Destination (Strict Mode)</label>
-              <span class="safe-badge">🔒 Locked to Selected</span>
-            </div>
-            <div class="target-options">
-              <label class="target-option-btn active" id="opt-target-org">
-                <input type="radio" name="studioTarget" value="organization" checked>
-                <span>🏢 Verdian (Company Page)</span>
-              </label>
-              <label class="target-option-btn" id="opt-target-person">
-                <input type="radio" name="studioTarget" value="person">
-                <span>👤 Personal Profile</span>
-              </label>
-            </div>
-
-            <!-- Quick Verdian Company ID / URL input -->
-            <div id="quick-org-input-box" class="quick-org-input mt-2">
-              <div class="flex-between">
-                <label class="form-label" style="font-size:0.75rem;">Verdian Numeric Page ID:</label>
-                <span class="safe-badge">🏢 ID: 117254291</span>
-              </div>
-              <input type="text" id="input-quick-org-urn" class="form-control" value="117254291" placeholder="117254291" style="font-size:0.82rem; padding: 0.5rem 0.75rem;">
-              <div class="form-hint mt-1" style="font-size:0.7rem;">
-                ✅ Connected to Veridian Digital Company Page (ID: <code>117254291</code>)
+          <!-- Section 1: Custom Prompt & Idea Sparks -->
+          <div class="studio-card">
+            <div class="card-head">
+              <span class="card-label">🎯 What should the AI write about?</span>
+              <div class="head-tools">
+                <button type="button" id="btn-clear-prompt" class="btn-text btn-xs" title="Clear prompt">Clear</button>
+                <span class="char-badge" id="prompt-char-count">0/300</span>
               </div>
             </div>
-          </div>
+            <textarea id="input-custom-prompt" class="textarea-prompt" rows="3" placeholder="Type any idea, lesson, or prompt... (e.g., '3 counter-intuitive architecture rules from scaling microservices', or 'Why autonomous AI agents are replacing rigid software pipelines')"></textarea>
 
-          <!-- 1-Click Viral Hiring Preset Banner -->
-          <div class="hiring-quick-banner">
-            <div class="hiring-banner-text">
-              <h4>🎯 Veridian Hiring Campaign</h4>
-              <p>1-Click generate viral sales hiring copy & auto-attach the official Veridian poster!</p>
-            </div>
-            <button type="button" id="btn-quick-hiring" class="btn btn-hiring-glow btn-sm">
-              🚀 Generate Hiring Post
-            </button>
-          </div>
-
-          <!-- Quick Topic Selector -->
-          <div class="form-group">
-            <label class="form-label">Niche / Campaign Category</label>
-            <div class="topic-chips" id="topic-chips-container">
-              <button type="button" class="chip active" data-topic="Hiring Remote Sales">💼 Hiring Remote Sales</button>
-              <button type="button" class="chip" data-topic="AI & Tech Trends">🤖 AI & Tech Trends</button>
-              <button type="button" class="chip" data-topic="Software Engineering Tips">🛠️ Engineering Tips</button>
-              <button type="button" class="chip" data-topic="Career & Productivity Growth">📈 Career Growth</button>
-            </div>
-          </div>
-
-          <!-- Custom Instructions / Prompt -->
-          <div class="form-group">
-            <label class="form-label" for="input-custom-prompt">
-              Custom Direction / Key Takeaway <span class="optional">(optional)</span>
-            </label>
-            <input type="text" id="input-custom-prompt" class="form-control" placeholder="e.g. Announcing new AI capabilities at Verdian...">
-          </div>
-
-          <!-- Tone Selector -->
-          <div class="form-group">
-            <label class="form-label" for="select-tone">Tone & Writing Style</label>
-            <select id="select-tone" class="form-control select-control">
-              <option value="engaging">🔥 Engaging & High Energy (Viral Hook)</option>
-              <option value="thought-leadership">🧠 Thought Leadership & Industry Insight</option>
-              <option value="educational">📚 Actionable / Framework Breakdown</option>
-              <option value="storytelling">📖 Relatable Story & Personal Journey</option>
-              <option value="contrarian">💡 Contrarian / Bold Truth</option>
-            </select>
-          </div>
-
-          <!-- Generate Button -->
-          <button id="btn-generate-ai" class="btn btn-gradient btn-block btn-lg">
-            <span class="btn-icon">✨</span> Generate Post & Visual with AI
-          </button>
-
-          <hr class="divider">
-
-          <!-- Post Content Editor -->
-          <div class="form-group">
-            <div class="flex-between mb-2">
-              <label class="form-label" for="post-editor">Post Text</label>
-              <div class="editor-tools">
-                <span id="char-counter" class="char-count">0 characters</span>
-                <button id="btn-copy-post" class="btn-text btn-xs" title="Copy to clipboard">📋 Copy</button>
+            <!-- Quick Sparks Grid -->
+            <div class="sparks-wrapper">
+              <span class="sparks-title">⚡ Quick Idea Sparks:</span>
+              <div class="sparks-grid" id="prompt-starters">
+                <button type="button" class="spark-chip" data-starter="3 architecture rules I swear by that prevent production outages on a Friday">
+                  💡 Architecture Rule
+                </button>
+                <button type="button" class="spark-chip" data-starter="Why multi-agent AI systems are replacing simple scripts in modern software engineering">
+                  🤖 AI Agent Shift
+                </button>
+                <button type="button" class="spark-chip" data-starter="The biggest lesson learned from building and shipping a tech product in 2026">
+                  🚀 Building in Public
+                </button>
+                <button type="button" class="spark-chip" data-starter="How 4 hours of ruthless uninterrupted focus beats an 80-hour chaotic work week">
+                  ⏱️ Deep Work Habit
+                </button>
+                <button type="button" class="spark-chip" data-starter="A contrarian truth about modern software development that most tech leads won't admit">
+                  ⚡ Contrarian Take
+                </button>
+                <button type="button" class="spark-chip" data-starter="Why writing clean, deletable code is more valuable than complex clever abstractions">
+                  🛠️ Clean Code Mindset
+                </button>
               </div>
             </div>
-            <textarea id="post-editor" class="form-control textarea-editor" rows="9" placeholder="Write or generate your LinkedIn post here..."></textarea>
           </div>
 
-          <!-- Image Attachment Section -->
-          <div class="form-group image-attach-section">
-            <label class="form-label">Attached Visual / Graphic <span class="optional">(Optional)</span></label>
-            <div class="image-action-bar">
-              <label class="btn btn-outline btn-sm file-upload-btn">
-                📁 Upload Image
+          <!-- Section 2: Domain & Tone -->
+          <div class="studio-card">
+            <div class="domain-tone-row">
+              <div class="form-col flex-2">
+                <label class="card-label">Category / Domain</label>
+                <div class="topic-chips" id="topic-chips-container">
+                  <button type="button" class="chip active" data-topic="AI & Automation Trends">🤖 AI & Automation</button>
+                  <button type="button" class="chip" data-topic="Software Engineering & Architecture">🛠️ Architecture</button>
+                  <button type="button" class="chip" data-topic="Tech Leadership & Building">🚀 Tech Leadership</button>
+                  <button type="button" class="chip" data-topic="Productivity & Deep Work">📈 Deep Work</button>
+                  <button type="button" class="chip" data-topic="Future of Technology">💡 Future of Tech</button>
+                </div>
+              </div>
+
+              <div class="form-col flex-1">
+                <label class="card-label" for="select-tone">Tone & Persona</label>
+                <div class="select-wrapper">
+                  <select id="select-tone" class="select-control">
+                    <option value="thought-leadership" selected>🧠 Thought Leadership</option>
+                    <option value="engaging">🔥 Engaging & Viral Hook</option>
+                    <option value="storytelling">📖 Personal Story & Lessons</option>
+                    <option value="educational">📚 Actionable Framework</option>
+                    <option value="contrarian">💡 Contrarian / Bold Truth</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: AI Visual Engine & Style Presets -->
+          <div class="studio-card visual-engine-card">
+            <div class="card-head">
+              <div class="head-title-icon">
+                <span class="icon-bubble">🎨</span>
+                <div>
+                  <span class="card-label">AI Visual Engine (Flux 8K)</span>
+                  <span class="card-sublabel">Select aesthetic style and aspect ratio for the attached visual</span>
+                </div>
+              </div>
+              <span class="badge-pill active-engine-pill" id="image-engine-badge">Flux AI HD</span>
+            </div>
+
+            <!-- Visual Style Selector Grid -->
+            <div class="visual-styles-grid" id="visual-styles-grid">
+              <div class="style-card active" data-style="cinematic">
+                <span class="style-icon">📸</span>
+                <div class="style-meta">
+                  <span class="style-name">Cinematic Tech</span>
+                  <span class="style-desc">Hasselblad 8k studio shot, dramatic lighting</span>
+                </div>
+                <div class="style-check">✓</div>
+              </div>
+
+              <div class="style-card" data-style="glass-3d">
+                <span class="style-icon">💎</span>
+                <div class="style-meta">
+                  <span class="style-name">3D Glass & Titanium</span>
+                  <span class="style-desc">Octane render, frosted glass, floating cubes</span>
+                </div>
+                <div class="style-check">✓</div>
+              </div>
+
+              <div class="style-card" data-style="cyber">
+                <span class="style-icon">⚡</span>
+                <div class="style-meta">
+                  <span class="style-name">Cybernetic Matrix</span>
+                  <span class="style-desc">Obsidian dark, glowing fiber optics, quantum nodes</span>
+                </div>
+                <div class="style-check">✓</div>
+              </div>
+
+              <div class="style-card" data-style="workspace">
+                <span class="style-icon">🏛️</span>
+                <div class="style-meta">
+                  <span class="style-name">Minimalist Sanctuary</span>
+                  <span class="style-desc">Architectural Digest desk, ambient blue hour</span>
+                </div>
+                <div class="style-check">✓</div>
+              </div>
+
+              <div class="style-card" data-style="abstract">
+                <span class="style-icon">🎨</span>
+                <div class="style-meta">
+                  <span class="style-name">Contemporary Bauhaus</span>
+                  <span class="style-desc">Swiss modern digital art, light ribbons</span>
+                </div>
+                <div class="style-check">✓</div>
+              </div>
+            </div>
+
+            <!-- Aspect Ratio & Prompt Bar -->
+            <div class="visual-controls-bar">
+              <div class="aspect-ratio-toggle">
+                <span class="toggle-label">Aspect:</span>
+                <div class="aspect-pills" id="aspect-ratio-selector">
+                  <button type="button" class="aspect-pill active" data-aspect="16:9">16:9 Banner</button>
+                  <button type="button" class="aspect-pill" data-aspect="1:1">1:1 Square</button>
+                </div>
+              </div>
+
+              <div class="visual-prompt-input-group">
+                <input type="text" id="input-image-prompt" class="input-visual-prompt" placeholder="Visual prompt auto-generates or customize here...">
+                <button type="button" id="btn-regen-ai-image" class="btn-regen-image" title="Regenerate visual with current prompt and style">
+                  <span class="regen-icon">🔄</span> Regenerate
+                </button>
+              </div>
+            </div>
+
+            <!-- Image Asset Actions -->
+            <div class="visual-assets-row">
+              <label class="btn-custom-upload">
+                📁 Upload Custom
                 <input type="file" id="input-file-image" accept="image/*" style="display:none;">
               </label>
-              <button type="button" id="btn-gen-ai-image" class="btn btn-outline btn-sm">🎨 AI Visual Idea</button>
-              <button type="button" id="btn-remove-image" class="btn btn-outline btn-sm text-danger hidden">✕ Remove</button>
+              <input type="url" id="input-image-url" class="input-image-url" placeholder="Or paste direct image URL (https://...)">
+              <button type="button" id="btn-remove-image" class="btn-remove-image hidden">✕ Remove</button>
             </div>
-            <input type="url" id="input-image-url" class="form-control mt-2" placeholder="Or paste Image URL (e.g. https://...)" style="font-size: 0.82rem;">
           </div>
 
-          <!-- Action Buttons -->
-          <div class="studio-actions">
-            <button id="btn-publish-now" class="btn btn-primary flex-1">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-              Post to LinkedIn Now
+          <!-- Generation CTA Button -->
+          <button id="btn-generate-ai" class="btn btn-primary-gradient btn-lg btn-block">
+            <span class="btn-icon">✨</span> Generate Post & AI Visual
+          </button>
+
+          <!-- Section 4: Post Copy & Formatter -->
+          <div class="studio-card post-editor-card">
+            <div class="card-head">
+              <div class="head-title-icon">
+                <span class="icon-bubble">✍️</span>
+                <span class="card-label">Post Copy & Polish</span>
+              </div>
+              <div class="editor-quick-tools">
+                <button id="btn-copy-post" class="btn-text btn-xs" title="Copy to clipboard">📋 Copy Text</button>
+              </div>
+            </div>
+
+            <!-- LinkedIn Formatting Pills -->
+            <div class="formatter-bar">
+              <span class="formatter-label">Quick Format:</span>
+              <button type="button" class="fmt-pill" id="fmt-hook" title="Add a high-converting hook">🪝 Add Hook</button>
+              <button type="button" class="fmt-pill" id="fmt-bullets" title="Convert paragraphs into bullet points">• Bulletize</button>
+              <button type="button" class="fmt-pill" id="fmt-cta" title="Add an engaging discussion question">❓ Add CTA</button>
+              <button type="button" class="fmt-pill" id="fmt-tags" title="Append high-performing hashtags"># Add Hashtags</button>
+            </div>
+
+            <!-- Post Textarea -->
+            <textarea id="post-editor" class="textarea-editor" rows="9" placeholder="Write or generate your LinkedIn post here..."></textarea>
+
+            <!-- LinkedIn Length Progress Indicator -->
+            <div class="length-indicator-box">
+              <div class="length-meta">
+                <span id="char-counter" class="char-count">0 characters</span>
+                <span id="length-quality-text" class="length-quality">Optimal length: 900 - 1,300 chars</span>
+              </div>
+              <div class="length-progress-track">
+                <div id="length-progress-bar" class="length-progress-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 5: Primary Action Bar -->
+          <div class="publisher-action-bar">
+            <button id="btn-publish-now" class="btn btn-primary btn-publish-lg">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+              Post to Personal Profile Now
             </button>
-            <button id="btn-add-to-queue" class="btn btn-secondary flex-1">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            <button id="btn-add-to-queue" class="btn btn-secondary btn-publish-lg">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
               Add to Schedule Queue
             </button>
           </div>
+
         </div>
 
-        <!-- Right: Live LinkedIn Preview Card -->
-        <div class="studio-panel preview-panel">
-          <div class="panel-header">
-            <h3>Feed Preview</h3>
-            <span class="preview-tag" id="preview-target-tag">Live LinkedIn Mockup</span>
-          </div>
+        <!-- Right Column: Live LinkedIn Desktop Feed Simulation -->
+        <div class="studio-preview-col">
+          <div class="preview-sticky-wrap">
+            
+            <div class="preview-header-bar">
+              <div class="preview-title-box">
+                <h3>Live LinkedIn Preview</h3>
+                <span class="preview-badge">👤 Personal Profile</span>
+              </div>
+              <div class="preview-device-tag">Desktop Feed</div>
+            </div>
 
-          <div class="linkedin-card-preview">
-            <!-- LinkedIn Header -->
-            <div class="li-header">
-              <img id="preview-avatar" src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=100&auto=format&fit=crop&q=80" alt="Avatar" class="li-avatar" />
-              <div class="li-author-meta">
-                <div class="li-name-row">
-                  <span id="preview-name" class="li-name">Verdian</span>
-                  <span class="li-degree" id="preview-degree">• Company</span>
+            <!-- Authentic LinkedIn Post Card Simulation -->
+            <div class="linkedin-card-desktop" id="linkedin-preview-card">
+              
+              <!-- LinkedIn Header -->
+              <div class="li-card-header">
+                <img id="preview-avatar" src="https://ui-avatars.com/api/?name=LinkedIn+User&background=0a66c2&color=fff" alt="Avatar" class="li-avatar" />
+                <div class="li-meta">
+                  <div class="li-name-row">
+                    <span id="preview-name" class="li-name">LinkedIn User</span>
+                    <span class="li-degree" id="preview-degree">• 1st</span>
+                  </div>
+                  <span class="li-headline" id="preview-headline">Software Engineer & Tech Builder 🚀</span>
+                  <div class="li-timestamp-row">
+                    <span class="li-time">Just now</span>
+                    <span class="li-dot">•</span>
+                    <span class="li-globe" title="Public post">🌐</span>
+                  </div>
                 </div>
-                <span class="li-headline" id="preview-headline">AI-Powered Autonomous Systems & Automation 🚀</span>
-                <span class="li-timestamp">Just now • 🌐</span>
+                <div class="li-dots-menu">•••</div>
               </div>
-              <div class="li-more-dots">•••</div>
-            </div>
 
-            <!-- LinkedIn Body Text -->
-            <div class="li-content" id="preview-content">
-              AI isn't going to replace developers, but developers using AI are replacing those who don't.
-              <br><br>
-              Click "Generate Post & Visual with AI" on the left to craft posts tailored for Verdian!
-            </div>
-
-            <!-- Attached Image Preview inside LinkedIn Card -->
-            <div id="preview-image-container" class="li-image-preview hidden">
-              <img id="preview-post-image" src="" alt="Post Visual" class="li-attached-img" />
-            </div>
-
-            <!-- LinkedIn Social Stats -->
-            <div class="li-social-stats">
-              <div class="li-reactions">
-                <span class="reaction-icon">👍</span>
-                <span class="reaction-icon">❤️</span>
-                <span class="reaction-icon">💡</span>
-                <span class="reaction-count">194</span>
+              <!-- Post Text Body -->
+              <div class="li-post-text" id="preview-content">
+                AI isn't going to replace software engineers, but engineers orchestrating AI workflows will replace those who don't.
+                <br><br>
+                Type an idea on the left or select a prompt spark to generate authentic insights with matching Flux AI visuals!
               </div>
-              <div class="li-comment-count">38 comments • 14 reposts</div>
+
+              <!-- Attached High-Res Visual Preview -->
+              <div id="preview-image-container" class="li-visual-container hidden">
+                <div class="visual-img-wrapper" id="visual-img-wrapper" title="Click to zoom visual">
+                  <img id="preview-post-image" src="" alt="Attached Post Visual" class="li-post-img" />
+                  <div class="img-badge-overlay">
+                    <span class="overlay-pill">✨ Flux AI HD</span>
+                    <span class="zoom-pill">🔍 Zoom</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Social Proof Stats Bar -->
+              <div class="li-social-proof">
+                <div class="li-reactions-stack">
+                  <span class="reaction-bubble like">👍</span>
+                  <span class="reaction-bubble love">❤️</span>
+                  <span class="reaction-bubble insight">💡</span>
+                  <span class="reaction-bubble clap">👏</span>
+                  <span class="reactions-count" id="preview-reactions-count">148</span>
+                </div>
+                <div class="li-social-counts">
+                  <span>32 comments</span>
+                  <span>•</span>
+                  <span>14 reposts</span>
+                </div>
+              </div>
+
+              <!-- LinkedIn Interactive Action Buttons -->
+              <div class="li-interactive-bar">
+                <button type="button" class="li-btn"><span class="li-btn-icon">👍</span> Like</button>
+                <button type="button" class="li-btn"><span class="li-btn-icon">💬</span> Comment</button>
+                <button type="button" class="li-btn"><span class="li-btn-icon">🔁</span> Repost</button>
+                <button type="button" class="li-btn"><span class="li-btn-icon">📤</span> Send</button>
+              </div>
+
             </div>
 
-            <!-- LinkedIn Actions Bar -->
-            <div class="li-action-bar">
-              <button class="li-action-btn"><span class="li-icon">👍</span> Like</button>
-              <button class="li-action-btn"><span class="li-icon">💬</span> Comment</button>
-              <button class="li-action-btn"><span class="li-icon">🔁</span> Repost</button>
-              <button class="li-action-btn"><span class="li-icon">🚀</span> Send</button>
+            <!-- Instant Autopilot Trigger Box -->
+            <div class="autopilot-test-card">
+              <div class="autopilot-test-info">
+                <h4>⚡ Daily Autopilot Live Test</h4>
+                <p>Execute today's scheduled autopilot run right now to verify image attachment and publishing.</p>
+              </div>
+              <button id="btn-trigger-cron-now" class="btn btn-outline btn-sm">Trigger Job Now</button>
             </div>
-          </div>
 
-          <!-- Quick Test Automated Flow -->
-          <div class="quick-test-box">
-            <div class="quick-test-info">
-              <h5>⚡ Instant Daily Auto-Post Test</h5>
-              <p>Trigger the scheduled daily post right now to verify publication.</p>
-            </div>
-            <button id="btn-trigger-cron-now" class="btn btn-outline btn-sm">Trigger Job Now</button>
           </div>
         </div>
 
@@ -334,70 +424,55 @@
     <!-- TAB 2: SCHEDULE & QUEUE -->
     <!-- ============================================== -->
     <section id="view-queue" class="tab-view">
-      <div class="queue-grid">
+      <div class="queue-layout">
         
-        <!-- Queue List -->
-        <div class="queue-main-panel">
+        <div class="queue-content-col">
           <div class="panel-header">
             <div>
-              <h3>Scheduled Posts Queue</h3>
-              <p class="panel-subtitle">Posts waiting to be published automatically to Verdian at your configured times.</p>
+              <h2 class="section-title">Publishing Queue</h2>
+              <p class="section-subtitle">Posts waiting to be published to your Personal LinkedIn Profile on schedule.</p>
             </div>
             <button id="btn-open-compose-modal" class="btn btn-primary btn-sm">+ Add Post to Queue</button>
           </div>
 
-          <div id="queue-container" class="queue-list">
-            <!-- Rendered dynamically -->
+          <div id="queue-container" class="queue-items-list">
+            <!-- Dynamically rendered -->
           </div>
         </div>
 
-        <!-- Schedule Settings Side Card -->
-        <div class="schedule-side-panel">
-          <div class="card">
-            <h4>⏰ Daily Schedule Config</h4>
-            <p class="card-subtitle">Set when and how often Verdian posts go live.</p>
+        <div class="queue-side-col">
+          <div class="studio-card">
+            <h3 class="card-label">⏰ Daily Schedule Settings</h3>
+            <p class="card-sublabel">Define when daily posts go live automatically.</p>
 
             <form id="form-schedule-settings" class="mt-3">
-              <div class="form-group">
-                <label class="form-label" for="input-schedule-time">Daily Posting Time</label>
-                <input type="time" id="input-schedule-time" class="form-control" value="09:00">
-                <small class="form-hint">Posts are published at this time.</small>
+              <div class="form-group mb-2">
+                <label class="form-label" for="setting-schedule-time">Daily Posting Time</label>
+                <input type="time" id="setting-schedule-time" class="form-control" value="09:00">
               </div>
 
-              <div class="form-group">
-                <label class="form-label">Posting Days</label>
-                <div class="days-selector" id="days-selector">
-                  <label class="day-chip"><input type="checkbox" name="days" value="1" checked> <span>M</span></label>
-                  <label class="day-chip"><input type="checkbox" name="days" value="2" checked> <span>T</span></label>
-                  <label class="day-chip"><input type="checkbox" name="days" value="3" checked> <span>W</span></label>
-                  <label class="day-chip"><input type="checkbox" name="days" value="4" checked> <span>T</span></label>
-                  <label class="day-chip"><input type="checkbox" name="days" value="5" checked> <span>F</span></label>
-                  <label class="day-chip"><input type="checkbox" name="days" value="6"> <span>S</span></label>
-                  <label class="day-chip"><input type="checkbox" name="days" value="0"> <span>S</span></label>
+              <div class="form-group mb-3">
+                <label class="form-label">Active Days</label>
+                <div class="days-selector">
+                  <label class="day-chip"><input type="checkbox" name="days" value="1" checked> Mon</label>
+                  <label class="day-chip"><input type="checkbox" name="days" value="2" checked> Tue</label>
+                  <label class="day-chip"><input type="checkbox" name="days" value="3" checked> Wed</label>
+                  <label class="day-chip"><input type="checkbox" name="days" value="4" checked> Thu</label>
+                  <label class="day-chip"><input type="checkbox" name="days" value="5" checked> Fri</label>
+                  <label class="day-chip"><input type="checkbox" name="days" value="6"> Sat</label>
+                  <label class="day-chip"><input type="checkbox" name="days" value="0"> Sun</label>
                 </div>
               </div>
 
-              <div class="form-group">
-                <label class="form-label">Automation Strategy</label>
-                <div class="radio-card-group">
-                  <label class="radio-card">
-                    <input type="radio" name="autopilotMode" value="autopilot" checked>
-                    <div class="radio-card-body">
-                      <strong>Full Auto-Pilot (Recommended)</strong>
-                      <span>Publishes from queue if available; otherwise auto-generates a fresh post for Verdian.</span>
-                    </div>
-                  </label>
-                  <label class="radio-card">
-                    <input type="radio" name="autopilotMode" value="queue">
-                    <div class="radio-card-body">
-                      <strong>Queue Review Only</strong>
-                      <span>Only publishes posts manually drafted or approved in your queue.</span>
-                    </div>
-                  </label>
-                </div>
+              <div class="form-group mb-3">
+                <label class="form-label" for="setting-autopilot-mode">Autopilot Policy</label>
+                <select id="setting-autopilot-mode" class="form-control select-control">
+                  <option value="autopilot" selected>Full Autopilot (Generate post + AI visual daily)</option>
+                  <option value="review">Queue Review Only (Only post pre-approved queue)</option>
+                </select>
               </div>
 
-              <button type="submit" class="btn btn-primary btn-block">Save Schedule Settings</button>
+              <button type="submit" class="btn btn-primary btn-block">Save Schedule</button>
             </form>
           </div>
         </div>
@@ -409,107 +484,94 @@
     <!-- TAB 3: POST HISTORY -->
     <!-- ============================================== -->
     <section id="view-history" class="tab-view">
-      <div class="panel-header">
-        <div>
-          <h3>Published Posts History</h3>
-          <p class="panel-subtitle">Log of all posts sent to LinkedIn via manual triggers or the daily scheduler.</p>
+      <div class="history-layout">
+        <div class="panel-header">
+          <div>
+            <h2 class="section-title">Published Post History</h2>
+            <p class="section-subtitle">Real-time log of published posts to your personal LinkedIn profile.</p>
+          </div>
+          <button id="btn-refresh-history" class="btn btn-outline btn-sm">🔄 Refresh</button>
         </div>
-        <button id="btn-refresh-history" class="btn btn-outline btn-sm">🔄 Refresh</button>
-      </div>
 
-      <div id="history-container" class="history-list">
-        <!-- Rendered dynamically -->
+        <div class="history-table-card">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Visual</th>
+                <th>Content Preview</th>
+                <th>Topic</th>
+                <th>Destination</th>
+                <th>Published At</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
     <!-- ============================================== -->
-    <!-- TAB 4: SETTINGS & SETUP GUIDE -->
+    <!-- TAB 4: SETTINGS & CONFIG -->
     <!-- ============================================== -->
     <section id="view-settings" class="tab-view">
-      <div class="settings-grid">
-        
-        <!-- Company Page / Destination Settings -->
-        <div class="card">
-          <h4>🏢 Target Page Settings</h4>
-          <p class="card-subtitle">Select whether to post to the Verdian Company Page or Personal Profile.</p>
+      <div class="settings-layout">
+        <div class="studio-card settings-card">
+          <h2 class="section-title">Settings & API Configuration</h2>
+          <p class="section-subtitle">Manage your personal profile connection, Gemini AI keys, and publishing options.</p>
 
-          <form id="form-target-settings" class="mt-3">
-            <div class="form-group">
-              <label class="form-label">Default Posting Target</label>
-              <select id="select-target-type" class="form-control select-control">
-                <option value="organization">🏢 Company Page (Verdian)</option>
-                <option value="person">👤 Personal Profile</option>
-              </select>
+          <div class="settings-section mt-4">
+            <h4 class="settings-head">LinkedIn Personal Account</h4>
+            <div class="account-details-box" id="settings-account-box">
+              <div class="user-row">
+                <img id="settings-user-avatar" src="" alt="Avatar" class="avatar-lg" />
+                <div>
+                  <h4 id="settings-user-name">Not Connected</h4>
+                  <p id="settings-user-urn" class="text-muted">Target: urn:li:person:me</p>
+                </div>
+              </div>
             </div>
+          </div>
 
-            <div class="form-group" id="group-org-config">
-              <label class="form-label" for="input-org-name">Company Page Name</label>
-              <input type="text" id="input-org-name" class="form-control" value="Verdian" placeholder="e.g. Verdian">
-              
-              <label class="form-label mt-2" for="input-org-urn">Organization ID / URN <span class="optional">(Optional if auto-detected)</span></label>
-              <input type="text" id="input-org-urn" class="form-control" placeholder="e.g. urn:li:organization:12345678 or 12345678">
-              <small class="form-hint">Find your page ID in your LinkedIn company page admin URL (e.g. linkedin.com/company/<strong>12345678</strong>/admin).</small>
+          <div class="settings-section mt-4">
+            <h4 class="settings-head">AI Engine & API Keys</h4>
+            <p class="form-hint">Google Gemini API key for dynamic post synthesis and Imagen 3. If omitted, PostPulse automatically uses the built-in smart dynamic engine and Flux AI.</p>
+            <div class="form-group mt-2">
+              <label class="form-label" for="setting-gemini-key">Google Gemini API Key (Optional)</label>
+              <div class="input-with-action">
+                <input type="password" id="setting-gemini-key" class="form-control" placeholder="AIzaSy...">
+                <button type="button" id="btn-save-gemini-key" class="btn btn-primary btn-sm">Save Key</button>
+              </div>
             </div>
+          </div>
 
-            <button type="submit" class="btn btn-primary">Save Target Settings</button>
-          </form>
+          <div class="settings-section mt-4">
+            <h4 class="settings-head">Manual Token Configuration (Optional)</h4>
+            <p class="form-hint">If you already generated an OAuth token in the LinkedIn Developer Portal, enter it here.</p>
+            <form id="form-manual-token" class="mt-2">
+              <div class="form-group mb-2">
+                <input type="text" id="manual-access-token" class="form-control" placeholder="Bearer Token (AQ...)" required>
+              </div>
+              <button type="submit" class="btn btn-outline btn-sm">Save Access Token</button>
+            </form>
+          </div>
         </div>
-
-        <!-- AI Generator Settings -->
-        <div class="card">
-          <h4>🤖 AI Generator & Topics</h4>
-          <p class="card-subtitle">Configure Google Gemini API key and custom topic categories.</p>
-
-          <form id="form-ai-settings" class="mt-3">
-            <div class="form-group">
-              <label class="form-label" for="input-gemini-key">
-                Google Gemini API Key <span class="optional">(Optional)</span>
-              </label>
-              <input type="password" id="input-gemini-key" class="form-control" placeholder="AIzaSy...">
-              <small class="form-hint">
-                Leave blank to use the built-in Smart Template Engine, or get a free key at 
-                <a href="https://aistudio.google.com/" target="_blank" rel="noopener">Google AI Studio</a>.
-              </small>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label" for="input-topics-list">Auto-Posting Topics (comma-separated)</label>
-              <textarea id="input-topics-list" class="form-control" rows="3" placeholder="AI & Tech Trends, Software Engineering, Productivity Growth"></textarea>
-            </div>
-
-            <button type="submit" class="btn btn-primary">Save AI Settings</button>
-          </form>
-        </div>
-
       </div>
     </section>
 
   </main>
 
-  <!-- Quick Add / Edit Post Modal -->
-  <div id="modal-post-editor" class="modal-overlay hidden">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3 id="modal-title">Edit Queued Post</h3>
-        <button id="modal-close" class="btn-icon">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label" for="modal-post-topic">Topic</label>
-          <input type="text" id="modal-post-topic" class="form-control" placeholder="e.g. AI & Tech Trends">
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="modal-post-content">Post Content</label>
-          <textarea id="modal-post-content" class="form-control textarea-editor" rows="7"></textarea>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="modal-post-image">Image URL (Optional)</label>
-          <input type="url" id="modal-post-image" class="form-control" placeholder="https://...">
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button id="modal-btn-cancel" class="btn btn-outline">Cancel</button>
-        <button id="modal-btn-save" class="btn btn-primary">Save to Queue</button>
+  <!-- Image Lightbox Modal for 8k Inspection -->
+  <div id="image-lightbox" class="lightbox-modal hidden">
+    <div class="lightbox-backdrop" id="lightbox-backdrop"></div>
+    <div class="lightbox-content">
+      <img id="lightbox-img" src="" alt="High Definition Visual">
+      <div class="lightbox-tools">
+        <a id="lightbox-download-link" href="" target="_blank" download="linkedin-visual.jpg" class="btn btn-outline btn-sm">💾 Open Full Image</a>
+        <button type="button" id="btn-close-lightbox" class="btn btn-outline btn-sm">✕ Close</button>
       </div>
     </div>
   </div>
