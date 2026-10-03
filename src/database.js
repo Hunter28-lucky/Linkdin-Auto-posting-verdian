@@ -28,6 +28,7 @@ const DEFAULT_DB = {
     defaultTone: 'engaging',
     geminiApiKey: process.env.GEMINI_API_KEY || '',
     targetType: 'person',
+    copyModel: 'staff-engine', // 'staff-engine' or 'gemini-2.0'
     // Image Generation Automation Settings
     imageGenerationEnabled: true,
     autoGenerateImages: true,

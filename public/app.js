@@ -9,12 +9,42 @@ const state = {
   history: [],
   currentTopic: 'AI & Automation Trends',
   currentTone: 'thought-leadership',
-  selectedStyle: 'cinematic',
+  selectedStyle: 'photorealistic',
   selectedAspectRatio: '16:9',
   currentImage: null,
   currentImagePrompt: '',
   activeTab: 'studio',
+  activeImageModel: getStoredImageModel(),
+  activeCopyModel: getStoredCopyModel(),
 };
+
+function getStoredImageModel() {
+  try {
+    return localStorage.getItem('postpulse_image_model') || 'flux-2-dev';
+  } catch {
+    return 'flux-2-dev';
+  }
+}
+
+function setStoredImageModel(model) {
+  try {
+    if (model) localStorage.setItem('postpulse_image_model', model);
+  } catch {}
+}
+
+function getStoredCopyModel() {
+  try {
+    return localStorage.getItem('postpulse_copy_model') || 'staff-engine';
+  } catch {
+    return 'staff-engine';
+  }
+}
+
+function setStoredCopyModel(model) {
+  try {
+    if (model) localStorage.setItem('postpulse_copy_model', model);
+  } catch {}
+}
 
 // ==========================================
 // AUTH STORAGE & API CLIENT (SERVERLESS SAFE)
@@ -119,6 +149,44 @@ function apiFetch(url, options = {}) {
   }
 
   return fetch(url, { ...options, headers, credentials: 'include' });
+}
+
+/**
+ * Robust JSON API Fetch Wrapper
+ * Automatically handles JSON and shields against HTML gateway errors (e.g. Vercel 504 / 404)
+ */
+async function apiFetchJson(url, options = {}) {
+  try {
+    const res = await apiFetch(url, options);
+    const contentType = res.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+      const data = await res.json();
+      return { ok: res.ok, status: res.status, data };
+    }
+
+    const rawText = await res.text();
+    const cleanSnippet = rawText.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+    const errMsg = cleanSnippet || `HTTP ${res.status}: ${res.statusText || 'Server Error'}`;
+
+    return {
+      ok: false,
+      status: res.status,
+      data: {
+        success: false,
+        error: errMsg,
+      },
+    };
+  } catch (netErr) {
+    return {
+      ok: false,
+      status: 0,
+      data: {
+        success: false,
+        error: netErr.message || 'Network connection failed',
+      },
+    };
+  }
 }
 
 // Toast notification helper
@@ -479,7 +547,7 @@ function initImageStudio() {
       regenBtn.innerHTML = '<span class="regen-icon">⏳</span> Generating...';
 
       try {
-        const res = await apiFetch('/api/ai/generate-image', {
+        const { ok, data } = await apiFetchJson('/api/ai/generate-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -488,14 +556,21 @@ function initImageStudio() {
             postContent,
             style: state.selectedStyle,
             aspectRatio: state.selectedAspectRatio,
+            model: state.activeImageModel || getStoredImageModel(),
           }),
         });
-        const data = await res.json();
-        if (data.success && data.imageUrl) {
+
+        if (ok && data?.success && data?.imageUrl) {
           updateImagePreview(data.imageUrl, data.imagePrompt);
+
+          const imgEngineEl = document.getElementById('provenance-image-engine');
+          if (imgEngineEl) imgEngineEl.textContent = data.engine || 'FLUX.2 Dev';
+          const overlayPill = document.querySelector('.overlay-pill');
+          if (overlayPill) overlayPill.textContent = `✨ ${data.engine || 'FLUX.2 Dev'}`;
+
           showToast(`New ${data.style || ''} visual generated via ${data.engine}! ✨`, 'success');
         } else {
-          showToast(data.error || 'Failed to regenerate visual', 'error');
+          showToast(data?.error || 'Failed to regenerate visual', 'error');
         }
       } catch (err) {
         showToast(`Image error: ${err.message}`, 'error');
@@ -611,7 +686,7 @@ function initActionButtons() {
       generateBtn.innerHTML = '<span class="btn-icon">⏳</span> Synthesizing Post & Visual...';
 
       try {
-        const res = await apiFetch('/api/posts/generate', {
+        const { ok, data } = await apiFetchJson('/api/posts/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -622,11 +697,12 @@ function initActionButtons() {
             style: state.selectedStyle,
             aspectRatio: state.selectedAspectRatio,
             geminiApiKey: geminiKey,
+            imageModel: state.activeImageModel || getStoredImageModel(),
+            copyModel: state.activeCopyModel || getStoredCopyModel(),
           }),
         });
 
-        const data = await res.json();
-        if (data.success) {
+        if (ok && data && data.success) {
           const editor = document.getElementById('post-editor');
           if (editor) {
             editor.value = data.content;
@@ -639,15 +715,15 @@ function initActionButtons() {
 
           // Update AI Provenance tags so the user knows exactly which AI generated this
           const textEngineEl = document.getElementById('provenance-text-engine');
-          if (textEngineEl) textEngineEl.textContent = data.engine || 'Staff Case Study Engine';
+          if (textEngineEl) textEngineEl.textContent = data.copyEngine || data.engine || 'Staff Case Study Engine';
           const imgEngineEl = document.getElementById('provenance-image-engine');
-          if (imgEngineEl) imgEngineEl.textContent = data.imageEngine || 'Flux AI 4K';
+          if (imgEngineEl) imgEngineEl.textContent = data.imageEngine || 'FLUX.2 Dev';
           const overlayPill = document.querySelector('.overlay-pill');
-          if (overlayPill) overlayPill.textContent = `✨ ${data.imageEngine || 'Flux AI 4K'}`;
+          if (overlayPill) overlayPill.textContent = `✨ ${data.imageEngine || 'FLUX.2 Dev'}`;
 
-          showToast(`Post & visual generated using ${data.engine}! ✨`, 'success');
+          showToast(`Post & visual generated using ${data.copyEngine || data.engine || 'Staff Case Study Engine'}! ✨`, 'success');
         } else {
-          showToast(data.error || 'Generation failed', 'error');
+          showToast(data?.error || 'Generation failed', 'error');
         }
       } catch (err) {
         showToast(`Generation error: ${err.message}`, 'error');
@@ -985,6 +1061,18 @@ function initImageAutomationSettings() {
   }
 }
 
+const IMAGE_MODEL_LABELS = {
+  'flux-2-dev': 'FLUX.2 Dev',
+  'flux-1-schnell': 'FLUX.1 Schnell',
+  'imagen-3': 'Google Imagen 3',
+  'pollinations-flux': 'Flux AI 4K',
+};
+
+const COPY_MODEL_LABELS = {
+  'staff-engine': 'Staff Engine',
+  'gemini-2.0': 'Gemini 2.0 Flash',
+};
+
 function updateEngineBadgeUI() {
   const badgeBtn = document.getElementById('btn-open-gemini-modal');
   const label = document.getElementById('engine-status-text');
@@ -992,23 +1080,48 @@ function updateEngineBadgeUI() {
   const modalInput = document.getElementById('modal-gemini-key-input');
   const settingsInput = document.getElementById('setting-gemini-key');
 
+  const currentImgModel = state.activeImageModel || getStoredImageModel() || 'flux-2-dev';
+  const currentCopyModel = state.activeCopyModel || getStoredCopyModel() || 'staff-engine';
   const geminiKey = getStoredGeminiKey();
 
+  const imgLabel = IMAGE_MODEL_LABELS[currentImgModel] || 'FLUX.2 Dev';
+  const copyLabel = COPY_MODEL_LABELS[currentCopyModel] || 'Staff Engine';
+
+  if (badgeBtn) {
+    badgeBtn.classList.add('active-gemini');
+    badgeBtn.title = `Active Models: Visual = ${imgLabel}, Copy = ${copyLabel}. Click to switch models.`;
+  }
+
+  if (label) {
+    label.textContent = `🟢 ${imgLabel} & ${copyLabel} Active`;
+  }
+
+  // Update Studio Live Preview provenance bars
+  const provImg = document.getElementById('provenance-image-engine');
+  if (provImg) provImg.textContent = imgLabel;
+
+  const provText = document.getElementById('provenance-text-engine');
+  if (provText) {
+    provText.textContent = currentCopyModel === 'gemini-2.0' ? 'Google Gemini 2.0 Flash' : 'Staff Case Study Engine';
+  }
+
+  // Update Image Studio header badge
+  const imgEngineBadge = document.getElementById('image-engine-badge');
+  if (imgEngineBadge) {
+    imgEngineBadge.textContent = imgLabel;
+  }
+
+  // Update Settings Image Model selector if present
+  const settingImgModel = document.getElementById('setting-image-model');
+  if (settingImgModel && settingImgModel.value !== currentImgModel) {
+    settingImgModel.value = currentImgModel;
+  }
+
   if (geminiKey) {
-    if (badgeBtn) {
-      badgeBtn.classList.add('active-gemini');
-      badgeBtn.title = 'Google Gemini 2.0 Flash & Imagen 3 Active. Click to manage.';
-    }
-    if (label) label.textContent = '🟢 Gemini 2.0 & Imagen 3 Active';
     if (disconnectBtn) disconnectBtn.classList.remove('hidden');
     if (modalInput && !modalInput.value) modalInput.value = geminiKey;
     if (settingsInput && !settingsInput.value) settingsInput.value = geminiKey;
   } else {
-    if (badgeBtn) {
-      badgeBtn.classList.remove('active-gemini');
-      badgeBtn.title = 'Click to connect Google Gemini 2.0 & Imagen 3 (Free)';
-    }
-    if (label) label.textContent = '⚡ Connect Gemini API Key (Free)';
     if (disconnectBtn) disconnectBtn.classList.add('hidden');
   }
 }
@@ -1024,6 +1137,45 @@ function initGeminiModal() {
   const toggleVisibilityBtn = document.getElementById('btn-toggle-key-visibility');
   const feedback = document.getElementById('gemini-validation-feedback');
 
+  function syncModalCardsWithState() {
+    const currentImgModel = state.activeImageModel || getStoredImageModel() || 'flux-2-dev';
+    const currentCopyModel = state.activeCopyModel || getStoredCopyModel() || 'staff-engine';
+
+    document.querySelectorAll('.model-option-card').forEach((card) => {
+      const radio = card.querySelector('input[type="radio"]');
+      const isSelected = radio && radio.value === currentImgModel;
+      if (radio) radio.checked = isSelected;
+      card.classList.toggle('active', isSelected);
+    });
+
+    document.querySelectorAll('.copy-option-card').forEach((card) => {
+      const radio = card.querySelector('input[type="radio"]');
+      const isSelected = radio && radio.value === currentCopyModel;
+      if (radio) radio.checked = isSelected;
+      card.classList.toggle('active', isSelected);
+    });
+  }
+
+  // Click handlers for visual model cards
+  document.querySelectorAll('.model-option-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.model-option-card').forEach((c) => c.classList.remove('active'));
+      card.classList.add('active');
+      const radio = card.querySelector('input[type="radio"]');
+      if (radio) radio.checked = true;
+    });
+  });
+
+  // Click handlers for copy model cards
+  document.querySelectorAll('.copy-option-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.copy-option-card').forEach((c) => c.classList.remove('active'));
+      card.classList.add('active');
+      const radio = card.querySelector('input[type="radio"]');
+      if (radio) radio.checked = true;
+    });
+  });
+
   function openModal() {
     if (!modal) return;
     const currentKey = getStoredGeminiKey();
@@ -1033,6 +1185,7 @@ function initGeminiModal() {
       feedback.textContent = '';
       feedback.className = 'validation-feedback hidden';
     }
+    syncModalCardsWithState();
     modal.classList.remove('hidden');
     updateEngineBadgeUI();
   }
@@ -1064,56 +1217,92 @@ function initGeminiModal() {
 
   if (saveBtn) {
     saveBtn.addEventListener('click', async () => {
-      const apiKey = keyInput?.value?.trim();
-      if (!apiKey) {
+      const selectedImgRadio = document.querySelector('input[name="modal-image-model"]:checked');
+      const selectedCopyRadio = document.querySelector('input[name="modal-copy-model"]:checked');
+      const chosenImageModel = selectedImgRadio ? selectedImgRadio.value : 'flux-2-dev';
+      const chosenCopyModel = selectedCopyRadio ? selectedCopyRadio.value : 'staff-engine';
+      const apiKey = keyInput?.value?.trim() || '';
+
+      const requiresGeminiKey = chosenCopyModel === 'gemini-2.0' || chosenImageModel === 'imagen-3';
+      const currentStoredKey = getStoredGeminiKey();
+
+      if (requiresGeminiKey && !apiKey && !currentStoredKey) {
         if (feedback) {
           feedback.className = 'validation-feedback error';
-          feedback.textContent = 'Please enter a valid Google Gemini API key.';
+          feedback.textContent = 'Selected model requires a Google Gemini API Key. Please paste your key below or choose FLUX / Staff Engine.';
           feedback.classList.remove('hidden');
         }
         return;
       }
 
       saveBtn.disabled = true;
-      saveBtn.innerHTML = '<span>Verifying with Google... ⏳</span>';
+      saveBtn.innerHTML = '<span>Saving & Verifying... ⏳</span>';
       if (feedback) feedback.classList.add('hidden');
 
       try {
-        const res = await apiFetch('/api/ai/verify-gemini-key', {
+        let verifiedKey = apiKey || currentStoredKey;
+        if (apiKey && apiKey !== currentStoredKey) {
+          const verifyRes = await apiFetchJson('/api/ai/verify-gemini-key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ apiKey }),
+          });
+
+          if (!verifyRes.ok || !verifyRes.data?.success) {
+            if (feedback) {
+              feedback.className = 'validation-feedback error';
+              feedback.textContent = `❌ Gemini key invalid: ${verifyRes.data?.error || 'Verification failed'}`;
+              feedback.classList.remove('hidden');
+            }
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<span>💾 Apply & Save Engine Selection</span>';
+            return;
+          }
+          verifiedKey = apiKey;
+          setStoredGeminiKey(apiKey);
+        }
+
+        // Apply state and persist in local storage
+        state.activeImageModel = chosenImageModel;
+        state.activeCopyModel = chosenCopyModel;
+        setStoredImageModel(chosenImageModel);
+        setStoredCopyModel(chosenCopyModel);
+
+        // Sync permanently to backend settings
+        await apiFetchJson('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ apiKey }),
+          body: JSON.stringify({
+            imageModel: chosenImageModel,
+            copyModel: chosenCopyModel,
+            ...(verifiedKey ? { geminiApiKey: verifiedKey } : {}),
+          }),
         });
-        const data = await res.json();
 
-        if (data.success) {
-          setStoredGeminiKey(apiKey);
-          updateEngineBadgeUI();
-          if (feedback) {
-            feedback.className = 'validation-feedback success';
-            feedback.textContent = '✅ Key verified! Google Gemini 2.0 Flash & Imagen 3 are now active.';
-            feedback.classList.remove('hidden');
-          }
-          showToast('Google Gemini 2.0 Flash & Imagen 3 Connected! ✨', 'success');
-          setTimeout(() => {
-            closeModal();
-          }, 1200);
-        } else {
-          if (feedback) {
-            feedback.className = 'validation-feedback error';
-            feedback.textContent = `❌ Verification failed: ${data.error || 'Invalid API Key'}`;
-            feedback.classList.remove('hidden');
-          }
+        updateEngineBadgeUI();
+
+        const imgLabel = IMAGE_MODEL_LABELS[chosenImageModel] || chosenImageModel;
+        const copyLabel = COPY_MODEL_LABELS[chosenCopyModel] || chosenCopyModel;
+
+        if (feedback) {
+          feedback.className = 'validation-feedback success';
+          feedback.textContent = `✅ Saved! Active models: ${imgLabel} (Visual) + ${copyLabel} (Copy).`;
+          feedback.classList.remove('hidden');
         }
+        showToast(`Active models updated: ${imgLabel} & ${copyLabel}`, 'success');
+
+        setTimeout(() => {
+          closeModal();
+        }, 1000);
       } catch (err) {
         if (feedback) {
           feedback.className = 'validation-feedback error';
-          feedback.textContent = `❌ Network error: ${err.message}`;
+          feedback.textContent = `❌ Error saving models: ${err.message}`;
           feedback.classList.remove('hidden');
         }
       } finally {
         saveBtn.disabled = false;
-        saveBtn.innerHTML = '<span>⚡ Verify & Connect Key</span>';
+        saveBtn.innerHTML = '<span>💾 Apply & Save Engine Selection</span>';
       }
     });
   }
@@ -1122,17 +1311,28 @@ function initGeminiModal() {
     disconnectBtn.addEventListener('click', async () => {
       setStoredGeminiKey('');
       if (keyInput) keyInput.value = '';
+      state.activeImageModel = 'flux-2-dev';
+      state.activeCopyModel = 'staff-engine';
+      setStoredImageModel('flux-2-dev');
+      setStoredCopyModel('staff-engine');
+      syncModalCardsWithState();
+
       try {
-        await apiFetch('/api/settings', {
+        await apiFetchJson('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ geminiApiKey: '' }),
+          body: JSON.stringify({
+            geminiApiKey: '',
+            copyModel: 'staff-engine',
+            imageModel: 'flux-2-dev',
+          }),
         });
       } catch (e) {
         console.warn('Disconnect backend sync error:', e);
       }
+
       updateEngineBadgeUI();
-      showToast('Gemini API key disconnected. Using Staff Case Study Engine.', 'info');
+      showToast('Gemini key cleared. Switched to FLUX.2 Dev & Staff Engine.', 'info');
       closeModal();
     });
   }
@@ -1143,8 +1343,8 @@ function initGeminiModal() {
 // ==========================================
 async function fetchStatus() {
   try {
-    const res = await apiFetch('/api/status');
-    const data = await res.json();
+    const { ok, data } = await apiFetchJson('/api/status');
+    if (!ok || !data) return;
     state.status = data;
 
     const storedAuth = getStoredAuth();
@@ -1156,10 +1356,18 @@ async function fetchStatus() {
     // Sync settings if present on backend
     if (data.settings) {
       const s = data.settings;
+      if (s.imageModel) {
+        state.activeImageModel = s.imageModel;
+        setStoredImageModel(s.imageModel);
+      }
+      if (s.copyModel) {
+        state.activeCopyModel = s.copyModel;
+        setStoredCopyModel(s.copyModel);
+      }
       if (s.geminiApiKey && !getStoredGeminiKey()) {
         setStoredGeminiKey(s.geminiApiKey);
-        updateEngineBadgeUI();
       }
+      updateEngineBadgeUI();
 
       // Populate image automation settings
       const genEnabled = document.getElementById('setting-image-gen-enabled');
@@ -1217,8 +1425,8 @@ async function fetchStatus() {
 
 async function fetchQueue() {
   try {
-    const res = await apiFetch('/api/queue');
-    const data = await res.json();
+    const { ok, data } = await apiFetchJson('/api/queue');
+    if (!ok || !data) return;
     state.queue = Array.isArray(data) ? data : (data.queue || []);
 
     const counter = document.getElementById('nav-queue-count');
@@ -1265,14 +1473,13 @@ async function fetchQueue() {
 
 async function publishQueueItem(id) {
   try {
-    const res = await apiFetch(`/api/queue/${id}/publish-now`, { method: 'POST' });
-    const data = await res.json();
-    if (data.success) {
+    const { ok, data } = await apiFetchJson(`/api/queue/${id}/publish-now`, { method: 'POST' });
+    if (ok && data?.success) {
       showToast('Post published to Personal Profile! 🚀', 'success');
       fetchQueue();
       fetchHistory();
     } else {
-      showToast(`Publishing failed: ${data.error}`, 'error');
+      showToast(`Publishing failed: ${data?.error || 'Unknown error'}`, 'error');
     }
   } catch (err) {
     showToast(`Error: ${err.message}`, 'error');
@@ -1281,9 +1488,8 @@ async function publishQueueItem(id) {
 
 async function deleteQueueItem(id) {
   try {
-    const res = await apiFetch(`/api/queue/${id}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
+    const { ok, data } = await apiFetchJson(`/api/queue/${id}`, { method: 'DELETE' });
+    if (ok && data?.success) {
       showToast('Item deleted from queue', 'info');
       fetchQueue();
     }
@@ -1294,8 +1500,8 @@ async function deleteQueueItem(id) {
 
 async function fetchHistory() {
   try {
-    const res = await apiFetch('/api/history');
-    const data = await res.json();
+    const { ok, data } = await apiFetchJson('/api/history');
+    if (!ok || !data) return;
     state.history = Array.isArray(data) ? data : (data.history || []);
 
     const tbody = document.getElementById('history-table-body');

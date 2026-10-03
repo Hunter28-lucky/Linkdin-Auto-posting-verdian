@@ -702,35 +702,108 @@
     </section>
 
   <!-- ============================================== -->
-  <!-- MODAL: GOOGLE GEMINI & IMAGEN 3 QUICK CONNECT -->
+  <!-- ============================================== -->
+  <!-- MODAL: AI ENGINE & MODEL SWITCHER -->
   <!-- ============================================== -->
   <div id="modal-gemini" class="modal-overlay hidden">
-    <div class="modal-container">
+    <div class="modal-container modal-wide">
       <div class="modal-header">
         <div class="modal-title-wrap">
-          <div class="modal-icon">✨</div>
+          <div class="modal-icon">⚡</div>
           <div>
-            <h3>Google Gemini 2.0 & Imagen 3</h3>
-            <p class="modal-subtitle">Generate Staff-Engineer depth insights with Gemini 2.0 Flash and 8K visuals with Google Imagen 3.</p>
+            <h3>AI Engine & Model Selector</h3>
+            <p class="modal-subtitle">Choose the active AI models for visual generation and copywriting. Changes save permanently.</p>
           </div>
         </div>
         <button type="button" id="btn-close-gemini-modal" class="btn-close-modal">&times;</button>
       </div>
       <div class="modal-body">
-        <div class="gemini-info-box">
-          <div class="info-row">
-            <span class="info-badge">🧠 Copywriting</span>
-            <span>Google Gemini 2.0 Flash (Staff Engineer / Founder Case Studies)</span>
-          </div>
-          <div class="info-row">
-            <span class="info-badge">🎨 AI Visuals</span>
-            <span>Google Imagen 3 (Photorealistic 8K Studio Renders)</span>
+        <!-- Visual Generation Model Selection -->
+        <div class="model-picker-section mb-4">
+          <label class="form-label font-bold mb-2">🎨 Active Visual Generation Model</label>
+          <div class="model-selection-grid">
+            <label class="model-option-card active" data-model="flux-2-dev">
+              <input type="radio" name="modal-image-model" value="flux-2-dev" checked>
+              <div class="model-card-content">
+                <div class="model-card-top">
+                  <span class="model-title">FLUX.2 Dev</span>
+                  <span class="model-tag-badge recommended">⭐ Primary</span>
+                </div>
+                <p class="model-desc">Cloudflare Workers AI edge GPUs. 20-step high-fidelity diffusion, photorealistic enterprise visuals.</p>
+                <div class="model-status-chip">⚡ Cloudflare Workers AI</div>
+              </div>
+            </label>
+
+            <label class="model-option-card" data-model="flux-1-schnell">
+              <input type="radio" name="modal-image-model" value="flux-1-schnell">
+              <div class="model-card-content">
+                <div class="model-card-top">
+                  <span class="model-title">FLUX.1 Schnell</span>
+                  <span class="model-tag-badge fast">⚡ Ultra Fast</span>
+                </div>
+                <p class="model-desc">Lightning-fast 4-step diffusion on Cloudflare Workers AI. Sub-2s generation.</p>
+                <div class="model-status-chip">⚡ Cloudflare Workers AI</div>
+              </div>
+            </label>
+
+            <label class="model-option-card" data-model="imagen-3">
+              <input type="radio" name="modal-image-model" value="imagen-3">
+              <div class="model-card-content">
+                <div class="model-card-top">
+                  <span class="model-title">Google Imagen 3</span>
+                  <span class="model-tag-badge key-needed">Requires Gemini Key</span>
+                </div>
+                <p class="model-desc">Photorealistic 8K studio renders via Google AI Studio API.</p>
+                <div class="model-status-chip">🔑 Google AI Studio</div>
+              </div>
+            </label>
+
+            <label class="model-option-card" data-model="pollinations-flux">
+              <input type="radio" name="modal-image-model" value="pollinations-flux">
+              <div class="model-card-content">
+                <div class="model-card-top">
+                  <span class="model-title">Flux AI 4K (Pollinations)</span>
+                  <span class="model-tag-badge free">Free Fallback</span>
+                </div>
+                <p class="model-desc">Public serverless fallback. Free inference without any API key.</p>
+                <div class="model-status-chip">🌐 Public Cloud</div>
+              </div>
+            </label>
           </div>
         </div>
 
-        <div class="form-group" style="margin-top: 16px;">
+        <!-- Copywriting Engine Selection -->
+        <div class="model-picker-section mb-4">
+          <label class="form-label font-bold mb-2">🧠 Active Copywriting Engine</label>
+          <div class="copy-selection-grid">
+            <label class="copy-option-card active" data-copy="staff-engine">
+              <input type="radio" name="modal-copy-model" value="staff-engine" checked>
+              <div class="copy-card-content">
+                <div class="model-card-top">
+                  <span class="model-title">Staff Engineer Case Study Engine</span>
+                  <span class="model-tag-badge built-in">✨ Built-in & Free</span>
+                </div>
+                <p class="model-desc">Zero robotic prefixes. High-signal engineering war stories, startup playbooks, and architectural lessons.</p>
+              </div>
+            </label>
+
+            <label class="copy-option-card" data-copy="gemini-2.0">
+              <input type="radio" name="modal-copy-model" value="gemini-2.0">
+              <div class="copy-card-content">
+                <div class="model-card-top">
+                  <span class="model-title">Google Gemini 2.0 Flash</span>
+                  <span class="model-tag-badge key-needed">Requires API Key</span>
+                </div>
+                <p class="model-desc">Dynamic generative reasoning for custom prompts via Google Generative Language API.</p>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Google Gemini API Key Input (shown when Gemini is selected or if user wants to add key) -->
+        <div id="modal-gemini-key-box" class="form-group mb-3">
           <div class="label-with-link">
-            <label class="form-label" for="modal-gemini-key-input">Gemini API Key</label>
+            <label class="form-label" for="modal-gemini-key-input">Google Gemini API Key (Optional)</label>
             <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="link-small">
               Get Free Key from Google AI Studio ↗
             </a>
@@ -739,16 +812,16 @@
             <input type="password" id="modal-gemini-key-input" class="form-control" placeholder="AIzaSy..." autocomplete="off">
             <button type="button" id="btn-toggle-key-visibility" class="btn-input-accessory" title="Toggle visibility">👁️</button>
           </div>
-          <span class="form-hint">Stored safely in your browser and automatically attached to post generation requests.</span>
+          <span class="form-hint">Enables Gemini 2.0 Flash copywriting & Google Imagen 3 renders.</span>
         </div>
 
         <div id="gemini-validation-feedback" class="validation-feedback hidden"></div>
       </div>
       <div class="modal-footer">
         <button type="button" id="btn-cancel-gemini-modal" class="btn btn-secondary btn-sm">Cancel</button>
-        <button type="button" id="btn-disconnect-gemini" class="btn btn-danger-outline btn-sm hidden">Disconnect Key</button>
+        <button type="button" id="btn-disconnect-gemini" class="btn btn-danger-outline btn-sm hidden">Clear Gemini Key</button>
         <button type="button" id="btn-save-gemini-modal" class="btn btn-primary btn-sm">
-          <span>⚡ Verify & Connect Key</span>
+          <span>💾 Apply & Save Engine Selection</span>
         </button>
       </div>
     </div>

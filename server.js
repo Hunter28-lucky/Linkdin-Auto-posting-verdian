@@ -3,6 +3,8 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 
+const querystring = require('querystring');
+
 const db = require('./src/database');
 const linkedin = require('./src/linkedin');
 const aiGenerator = require('./src/aiGenerator');
@@ -11,9 +13,55 @@ const scheduler = require('./src/scheduler');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Vercel Serverless Path Resolver:
+// Restores original path if Vercel serverless rewrites corrupted req.url to /server.js or /api/index.js
+app.use((req, res, next) => {
+  if (req.url === '/server.js' || req.url.startsWith('/server.js?') || req.url === '/api/index.js' || req.url.startsWith('/api/index.js?')) {
+    const forwardedUri = req.headers['x-forwarded-uri'] || req.headers['x-original-url'] || req.headers['x-invoke-path'];
+    const matchedPath = req.headers['x-matched-path'];
+    const routeMatches = req.headers['x-now-route-matches'];
+
+    let realPath = null;
+    if (forwardedUri && !forwardedUri.includes('server.js') && !forwardedUri.includes('api/index.js')) {
+      realPath = forwardedUri;
+    } else if (matchedPath && !matchedPath.includes('server.js') && !matchedPath.includes('api/index.js')) {
+      realPath = matchedPath;
+    } else if (routeMatches) {
+      try {
+        const parsed = querystring.parse(routeMatches);
+        if (parsed['1']) {
+          realPath = '/' + decodeURIComponent(parsed['1']).replace(/^\//, '');
+        }
+      } catch (e) {}
+    }
+
+    if (realPath) {
+      const qIdx = req.url.indexOf('?');
+      const query = qIdx !== -1 ? req.url.slice(qIdx) : '';
+      req.url = realPath + (query && !realPath.includes('?') ? query : '');
+    }
+  }
+  next();
+});
+
 app.use(cors());
 app.use(express.json({ limit: '15mb' }));
 app.use(express.urlencoded({ extended: true, limit: '15mb' }));
+
+// Explicit route fallbacks if Vercel forwards with URL already rewritten
+app.post('/server.js', (req, res, next) => {
+  if (req.body && (req.body.topic || req.body.content || req.body.customPrompt)) {
+    req.url = '/api/posts/generate';
+    return app.handle(req, res);
+  }
+  req.url = '/api/status';
+  return app.handle(req, res);
+});
+
+app.get('/server.js', (req, res, next) => {
+  req.url = '/api/status';
+  return app.handle(req, res);
+});
 
 // Middleware to parse cookies and authorization headers for unbreakable auth
 app.use(async (req, res, next) => {
@@ -242,7 +290,7 @@ app.get('/api/ai/image-styles', (req, res) => {
 
 app.post('/api/posts/generate', async (req, res) => {
   try {
-    const { topic, tone, customPrompt, customImagePrompt, style, aspectRatio, geminiApiKey } = req.body;
+    const { topic, tone, customPrompt, customImagePrompt, style, aspectRatio, geminiApiKey, imageModel, copyModel } = req.body;
     const clientKey = geminiApiKey || req.headers['x-gemini-api-key'] || '';
 
     const generated = await aiGenerator.generatePost({
@@ -253,6 +301,8 @@ app.post('/api/posts/generate', async (req, res) => {
       style,
       aspectRatio,
       geminiApiKey: clientKey,
+      imageModel,
+      copyModel,
     });
 
     res.json({
@@ -268,7 +318,7 @@ app.post('/api/posts/generate', async (req, res) => {
 // Dedicated endpoint to generate / regenerate tailored AI image (FLUX.2 Dev)
 app.post('/api/ai/generate-image', async (req, res) => {
   try {
-    const { prompt, topic, postContent, style, aspectRatio, width, height, customInstructions, geminiApiKey } = req.body;
+    const { prompt, topic, postContent, style, aspectRatio, width, height, customInstructions, geminiApiKey, model } = req.body;
     const settings = db.getSettings();
     const apiKey = geminiApiKey || req.headers['x-gemini-api-key'] || settings.geminiApiKey || process.env.GEMINI_API_KEY;
 
@@ -290,6 +340,7 @@ app.post('/api/ai/generate-image', async (req, res) => {
       topic,
       postContent,
       customInstructions: customInstructions || settings.customImageInstructions,
+      model: model || settings.imageModel || 'flux-2-dev',
     });
 
     res.json({

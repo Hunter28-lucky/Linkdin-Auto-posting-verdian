@@ -2186,3 +2186,122 @@ input:checked + .slider:before {
   border-radius: var(--radius-xs);
   border: 1px solid var(--border-subtle);
 }
+
+/* ==========================================
+   MODEL SWITCHER MODAL STYLES
+   ========================================== */
+
+.modal-wide {
+  max-width: 680px !important;
+  width: 95% !important;
+}
+
+.model-selection-grid, .copy-selection-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .model-selection-grid, .copy-selection-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.model-option-card, .copy-option-card {
+  display: block;
+  position: relative;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.model-option-card:hover, .copy-option-card:hover {
+  border-color: rgba(56, 189, 248, 0.4);
+  background: rgba(30, 41, 59, 0.7);
+  transform: translateY(-2px);
+}
+
+.model-option-card.active, .copy-option-card.active {
+  border-color: var(--accent-indigo);
+  background: rgba(99, 102, 241, 0.12);
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.2);
+}
+
+.model-option-card input[type="radio"], .copy-option-card input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.model-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.model-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.model-tag-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.model-tag-badge.recommended {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.model-tag-badge.fast {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.model-tag-badge.key-needed {
+  background: rgba(139, 92, 246, 0.2);
+  color: #c084fc;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+}
+
+.model-tag-badge.free {
+  background: rgba(148, 163, 184, 0.2);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.model-tag-badge.built-in {
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+.model-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin-bottom: 0.5rem;
+}
+
+.model-status-chip {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}

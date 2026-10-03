@@ -557,6 +557,7 @@ async function generateAiImage(imagePrompt, apiKey, options = {}) {
   const styleKey = options.style || settings.imageStyle || 'photorealistic';
   const aspectRatio = options.aspectRatio || settings.aspectRatio || '16:9';
   const customInstructions = options.customInstructions || settings.customImageInstructions || '';
+  const requestedModel = options.model || settings.imageModel || 'flux-2-dev';
 
   let width = options.width || settings.imageWidth || (aspectRatio === '1:1' ? 1080 : aspectRatio === '4:5' ? 1080 : 1200);
   let height = options.height || settings.imageHeight || (aspectRatio === '1:1' ? 1080 : aspectRatio === '4:5' ? 1350 : 675);
@@ -572,9 +573,58 @@ async function generateAiImage(imagePrompt, apiKey, options = {}) {
 
   while (attempts <= maxRetries) {
     attempts++;
+
+    // Branch A: If user explicitly selected Google Imagen 3
+    if (requestedModel === 'imagen-3') {
+      const geminiKey = apiKey || settings.geminiApiKey || process.env.GEMINI_API_KEY;
+      if (geminiKey) {
+        try {
+          console.log('[AI Image] Generating visual with Google Imagen 3...');
+          const imagenResult = await generateWithGoogleImagen(cleanPrompt, geminiKey, aspectRatio);
+          if (imagenResult) {
+            return {
+              imageUrl: imagenResult,
+              dataUri: imagenResult,
+              imagePrompt: cleanPrompt,
+              engine: 'Google Imagen 3',
+              style: styleKey,
+              aspectRatio,
+              width,
+              height,
+            };
+          }
+        } catch (imagenErr) {
+          lastError = imagenErr;
+          console.warn('[AI Image] Google Imagen 3 notice:', imagenErr.message);
+        }
+      }
+    }
+
+    // Branch B: If user explicitly selected Pollinations Flux 4K
+    if (requestedModel === 'pollinations-flux') {
+      try {
+        console.log('[AI Image] Generating visual with Pollinations Flux AI 4K...');
+        const encodedPrompt = encodeURIComponent(cleanPrompt.slice(0, 500));
+        const seed = Math.floor(Math.random() * 1000000);
+        const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&model=flux&enhance=true&nologo=true&seed=${seed}`;
+        return {
+          imageUrl: pollinationsUrl,
+          dataUri: null,
+          imagePrompt: cleanPrompt,
+          engine: 'Flux AI 4K (Pollinations)',
+          style: styleKey,
+          aspectRatio,
+          width,
+          height,
+        };
+      } catch (pollErr) {
+        lastError = pollErr;
+      }
+    }
+
+    // Branch C: Primary Cloudflare Workers AI (FLUX.2 Dev or FLUX.1 Schnell)
     try {
-      // 1. Primary: Cloudflare Workers AI (FLUX.2 Dev & FLUX.1 Schnell)
-      const cfResult = await generateWithCloudflareWorkersAi(cleanPrompt, options);
+      const cfResult = await generateWithCloudflareWorkersAi(cleanPrompt, { ...options, model: requestedModel });
       if (validateGeneratedImage(cfResult)) {
         return {
           ...cfResult,
@@ -590,14 +640,13 @@ async function generateAiImage(imagePrompt, apiKey, options = {}) {
       console.warn(`[AI Image] Cloudflare Workers AI attempt ${attempts} warning: ${cfErr.message}`);
     }
 
-    // 2. Secondary: Google Imagen 3 if Gemini key is available
-    const geminiKey = apiKey || settings.geminiApiKey || process.env.GEMINI_API_KEY;
-    if (geminiKey) {
+    // Fallback 1: Google Imagen 3 (if Gemini key available)
+    const fallbackGeminiKey = apiKey || settings.geminiApiKey || process.env.GEMINI_API_KEY;
+    if (fallbackGeminiKey && requestedModel !== 'imagen-3') {
       try {
         console.log('[AI Image] Attempting Google Imagen 3 fallback...');
-        const imagenResult = await generateWithGoogleImagen(cleanPrompt, geminiKey, aspectRatio);
+        const imagenResult = await generateWithGoogleImagen(cleanPrompt, fallbackGeminiKey, aspectRatio);
         if (imagenResult) {
-          console.log('[AI Image] ✅ Successfully generated image with Google Imagen 3');
           return {
             imageUrl: imagenResult,
             dataUri: imagenResult,
@@ -610,13 +659,13 @@ async function generateAiImage(imagePrompt, apiKey, options = {}) {
           };
         }
       } catch (imagenErr) {
-        console.warn('[AI Image] Google Imagen 3 notice:', imagenErr.message);
+        console.warn('[AI Image] Google Imagen 3 fallback notice:', imagenErr.message);
       }
     }
 
-    // 3. Tertiary: Pollinations Flux AI 4K
+    // Fallback 2: Pollinations Flux AI 4K
     try {
-      console.log(`[AI Image] Attempting Pollinations Flux AI fallback...`);
+      console.log('[AI Image] Attempting Pollinations Flux AI fallback...');
       const encodedPrompt = encodeURIComponent(cleanPrompt.slice(0, 500));
       const seed = Math.floor(Math.random() * 1000000);
       const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&model=flux&enhance=true&nologo=true&seed=${seed}`;
@@ -633,7 +682,6 @@ async function generateAiImage(imagePrompt, apiKey, options = {}) {
       };
     } catch (pollErr) {
       lastError = pollErr;
-      console.warn('[AI Image] Pollinations fallback notice:', pollErr.message);
     }
   }
 
@@ -741,21 +789,23 @@ function verifyGeminiKey(apiKey) {
  * Generate Post using Google Gemini API if key available,
  * or Staff Engineer Case Study Engine, accompanied by tailored AI visual (FLUX.2 Dev / Cloudflare Workers AI).
  */
-async function generatePost({ topic = 'AI & Automation Trends', tone = 'engaging', customPrompt = '', customImagePrompt = '', style, aspectRatio, geminiApiKey = '' }) {
+async function generatePost({ topic = 'AI & Automation Trends', tone = 'engaging', customPrompt = '', customImagePrompt = '', style, aspectRatio, geminiApiKey = '', imageModel, copyModel }) {
   const settings = db.getSettings();
   const apiKey = geminiApiKey || settings.geminiApiKey || process.env.GEMINI_API_KEY;
+  const activeCopyEngine = copyModel || settings.copyModel || (apiKey ? 'gemini-2.0' : 'staff-engine');
 
   let postData = null;
 
-  if (apiKey) {
+  if (activeCopyEngine === 'gemini-2.0' && apiKey) {
     try {
-      console.log('[AI Generator] Generating thought leadership copy with Google Gemini...');
+      console.log('[AI Generator] Generating thought leadership copy with Google Gemini 2.0 Flash...');
       postData = await generateWithGemini(apiKey, topic, tone, customPrompt);
     } catch (err) {
       console.warn('[AI Generator] Gemini API call failed, falling back to Staff Case Study Engine:', err.message);
       postData = generateDynamicTemplate(topic, tone, customPrompt);
     }
   } else {
+    console.log('[AI Generator] Generating thought leadership copy with Staff Engineer Case Study Engine...');
     postData = generateDynamicTemplate(topic, tone, customPrompt);
   }
 
@@ -768,6 +818,7 @@ async function generatePost({ topic = 'AI & Automation Trends', tone = 'engaging
     const visualAspect = aspectRatio || settings.aspectRatio || '16:9';
     const customInstructions = settings.customImageInstructions || '';
     const visualPrompt = customImagePrompt || postData.suggestedImagePrompt || createImagePrompt(postData.topic, postData.content, visualStyle, customInstructions);
+    const activeImageModel = imageModel || settings.imageModel || 'flux-2-dev';
 
     try {
       imageObj = await generateAiImage(visualPrompt, apiKey, {
@@ -776,6 +827,7 @@ async function generatePost({ topic = 'AI & Automation Trends', tone = 'engaging
         topic: postData.topic,
         postContent: postData.content,
         customInstructions,
+        model: activeImageModel,
       });
     } catch (imgErr) {
       console.warn('[AI Generator] Image generation warning:', imgErr.message);
@@ -790,6 +842,7 @@ async function generatePost({ topic = 'AI & Automation Trends', tone = 'engaging
 
   return {
     ...postData,
+    copyEngine: postData.copyEngine || (activeCopyEngine === 'gemini-2.0' ? 'Google Gemini 2.0 Flash' : 'Staff Case Study Engine'),
     imageUrl: imageObj ? imageObj.imageUrl : null,
     imageData: imageObj ? (imageObj.dataUri || null) : null,
     imagePrompt: imageObj ? imageObj.imagePrompt : null,
