@@ -16,7 +16,11 @@ const PORT = process.env.PORT || 3000;
 // Vercel Serverless Path Resolver:
 // Restores original path if Vercel serverless rewrites corrupted req.url to /server.js or /api/index.js
 app.use((req, res, next) => {
-  if (req.url === '/server.js' || req.url.startsWith('/server.js?') || req.url === '/api/index.js' || req.url.startsWith('/api/index.js?')) {
+  if (
+    req.url === '/server.js' || req.url.startsWith('/server.js?') ||
+    req.url === '/api/index.js' || req.url.startsWith('/api/index.js?') ||
+    req.url === '/api' || req.url.startsWith('/api?')
+  ) {
     const forwardedUri = req.headers['x-forwarded-uri'] || req.headers['x-original-url'] || req.headers['x-invoke-path'];
     const matchedPath = req.headers['x-matched-path'];
     const routeMatches = req.headers['x-now-route-matches'];
@@ -31,6 +35,9 @@ app.use((req, res, next) => {
         const parsed = querystring.parse(routeMatches);
         if (parsed['1']) {
           realPath = '/' + decodeURIComponent(parsed['1']).replace(/^\//, '');
+          if (!realPath.startsWith('/api') && !realPath.startsWith('/auth')) {
+            realPath = '/api/' + realPath.replace(/^\//, '');
+          }
         }
       } catch (e) {}
     }
@@ -41,6 +48,16 @@ app.use((req, res, next) => {
       req.url = realPath + (query && !realPath.includes('?') ? query : '');
     }
   }
+
+  // Prepend /api if route arrived stripped inside api lambda
+  const apiPrefixes = ['/status', '/posts', '/queue', '/history', '/settings', '/cron', '/ai'];
+  for (const prefix of apiPrefixes) {
+    if (req.url === prefix || req.url.startsWith(prefix + '/') || req.url.startsWith(prefix + '?')) {
+      req.url = '/api' + req.url;
+      break;
+    }
+  }
+
   next();
 });
 
