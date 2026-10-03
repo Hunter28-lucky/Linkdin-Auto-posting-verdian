@@ -250,8 +250,8 @@ app.post('/api/posts/generate', async (req, res) => {
       tone,
       customPrompt,
       customImagePrompt,
-      style: style || 'cinematic',
-      aspectRatio: aspectRatio || '16:9',
+      style,
+      aspectRatio,
       geminiApiKey: clientKey,
     });
 
@@ -265,21 +265,31 @@ app.post('/api/posts/generate', async (req, res) => {
   }
 });
 
-// Dedicated endpoint to generate / regenerate tailored AI image
+// Dedicated endpoint to generate / regenerate tailored AI image (FLUX.2 Dev)
 app.post('/api/ai/generate-image', async (req, res) => {
   try {
-    const { prompt, topic, postContent, style, aspectRatio, geminiApiKey } = req.body;
+    const { prompt, topic, postContent, style, aspectRatio, width, height, customInstructions, geminiApiKey } = req.body;
     const settings = db.getSettings();
     const apiKey = geminiApiKey || req.headers['x-gemini-api-key'] || settings.geminiApiKey || process.env.GEMINI_API_KEY;
 
     let finalPrompt = prompt;
     if (!finalPrompt || !finalPrompt.trim()) {
-      finalPrompt = aiGenerator.createImagePrompt(topic || 'Technology', postContent || '', style || 'cinematic');
+      finalPrompt = aiGenerator.createImagePrompt(
+        topic || 'Technology',
+        postContent || '',
+        style || settings.imageStyle || 'photorealistic',
+        customInstructions || settings.customImageInstructions || ''
+      );
     }
 
     const imageResult = await aiGenerator.generateAiImage(finalPrompt.trim(), apiKey, {
-      style: style || 'cinematic',
-      aspectRatio: aspectRatio || '16:9',
+      style: style || settings.imageStyle || 'photorealistic',
+      aspectRatio: aspectRatio || settings.aspectRatio || '16:9',
+      width: width || settings.imageWidth,
+      height: height || settings.imageHeight,
+      topic,
+      postContent,
+      customInstructions: customInstructions || settings.customImageInstructions,
     });
 
     res.json({
@@ -288,6 +298,37 @@ app.post('/api/ai/generate-image', async (req, res) => {
     });
   } catch (err) {
     console.error('[API] AI Image generation error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Endpoint to verify and persist user's Cloudflare Account ID & API Token
+app.post('/api/ai/verify-cloudflare', async (req, res) => {
+  try {
+    const { accountId, apiToken } = req.body;
+    if (!accountId || !apiToken) {
+      return res.status(400).json({ success: false, error: 'Both Account ID and API Token are required.' });
+    }
+
+    const verification = await aiGenerator.verifyCloudflareCredentials(accountId.trim(), apiToken.trim());
+    if (verification.valid) {
+      await db.updateSettingsAsync({
+        cloudflareAccountId: accountId.trim(),
+        cloudflareApiToken: apiToken.trim(),
+      });
+      res.json({
+        success: true,
+        message: `Cloudflare Workers AI connected successfully! (Account: ${verification.accountName})`,
+        accountName: verification.accountName,
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: verification.error || 'Failed to verify Cloudflare credentials.',
+      });
+    }
+  } catch (err) {
+    console.error('[API] Cloudflare verify error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -379,11 +420,50 @@ app.get('/api/queue', (req, res) => {
 });
 
 app.post('/api/queue', async (req, res) => {
-  const { content, topic, tone, imageUrl, scheduledFor } = req.body;
+  const { content, topic, tone, imageUrl, imageData, scheduledFor } = req.body;
   if (!content || !content.trim()) {
     return res.status(400).json({ error: 'Content is required.' });
   }
-  const post = await db.addToQueueAsync({ content: content.trim(), topic, tone, imageUrl, scheduledFor });
+
+  const settings = db.getSettings();
+  let finalImageUrl = imageUrl || null;
+  let finalImageData = imageData || null;
+  let finalImagePrompt = null;
+  let finalImageEngine = null;
+
+  // Auto-generate image before queueing if enabled and missing
+  if (!finalImageUrl && settings.imageGenerationEnabled !== false && settings.autoGenerateImages !== false) {
+    try {
+      console.log('[Queue] 🎨 Pre-generating FLUX.2 Dev visual before saving to queue...');
+      const imgStyle = settings.imageStyle || 'photorealistic';
+      const prompt = aiGenerator.createImagePrompt(topic || 'Technology', content.trim(), imgStyle, settings.customImageInstructions);
+      const generatedImg = await aiGenerator.generateAiImage(prompt, null, {
+        topic: topic || 'Technology',
+        postContent: content.trim(),
+        style: imgStyle,
+        aspectRatio: settings.aspectRatio || '16:9',
+      });
+      if (generatedImg && generatedImg.imageUrl) {
+        finalImageUrl = generatedImg.imageUrl;
+        finalImageData = generatedImg.dataUri || null;
+        finalImagePrompt = generatedImg.imagePrompt;
+        finalImageEngine = generatedImg.engine;
+      }
+    } catch (imgErr) {
+      console.warn('[Queue] Pre-queue image generation warning:', imgErr.message);
+    }
+  }
+
+  const post = await db.addToQueueAsync({
+    content: content.trim(),
+    topic: topic || 'General',
+    tone: tone || 'engaging',
+    imageUrl: finalImageUrl,
+    imageData: finalImageData,
+    imagePrompt: finalImagePrompt,
+    imageEngine: finalImageEngine,
+    scheduledFor: scheduledFor || null,
+  });
   res.json({ success: true, post });
 });
 
@@ -400,6 +480,41 @@ app.delete('/api/queue/:id', async (req, res) => {
   const { id } = req.params;
   const removed = await db.removeFromQueueAsync(id);
   res.json({ success: removed });
+});
+
+app.post('/api/queue/:id/publish-now', async (req, res) => {
+  const { id } = req.params;
+  const queue = db.getQueue();
+  const item = queue.find((p) => p.id === id);
+  if (!item) {
+    return res.status(404).json({ error: 'Queued post not found.' });
+  }
+
+  try {
+    const result = await linkedin.publishPost(item.content, {
+      imageUrl: item.imageUrl,
+      imageData: item.imageData,
+      targetType: 'person',
+    });
+
+    await db.removeFromQueueAsync(id);
+    const historyItem = await db.addToHistoryAsync({
+      content: item.content,
+      topic: item.topic || 'Queued Publish',
+      status: 'success',
+      linkedinPostUrn: result.postUrn,
+      authorUrn: result.authorUrn,
+      imageUrl: item.imageUrl || null,
+      imageEngine: item.imageEngine || (item.imageUrl ? 'FLUX.2 Dev' : null),
+      imageStatus: item.imageUrl ? 'attached' : 'none',
+      api: result.api,
+    });
+
+    res.json({ success: true, postUrn: result.postUrn, historyItem });
+  } catch (err) {
+    console.error('[API] Queue publish-now error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.get('/api/history', (req, res) => {

@@ -1,4 +1,6 @@
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
 const db = require('./database');
 
 // Battle-tested, high-signal thought-leadership templates & case studies
@@ -206,6 +208,56 @@ The systems we design today are laying the infrastructure for how humanity creat
 };
 
 const IMAGE_STYLES = {
+  auto: {
+    id: 'auto',
+    name: 'Auto (Contextual)',
+    icon: '✨',
+    description: 'Intelligently tailored to the post topic (Tech, Business, or Architecture)',
+    suffix: ', editorial tech visualization, clean balanced lighting, 8k, hyper-detailed, photorealistic, no text, no watermark, no logos',
+  },
+  photorealistic: {
+    id: 'photorealistic',
+    name: 'Photorealistic',
+    icon: '📸',
+    description: 'Cinematic 35mm photograph, dramatic natural studio lighting, ultra-sharp focus',
+    suffix: ', cinematic 35mm photograph, dramatic natural chiaroscuro studio lighting, Hasselblad 80mm lens, depth of field, 8k, hyper-detailed, photorealistic, no text, no letters, no logos, no watermark, no faces',
+  },
+  editorial: {
+    id: 'editorial',
+    name: 'Professional Editorial',
+    icon: '📰',
+    description: 'Bloomberg Businessweek and Wired magazine editorial feature photography',
+    suffix: ', high-end editorial magazine photography, Wired and Bloomberg Businessweek aesthetic, sophisticated composition, dramatic studio lighting, rich contrast, 8k, award-winning photography, no text, no logos',
+  },
+  technology: {
+    id: 'technology',
+    name: 'Technology',
+    icon: '⚡',
+    description: 'Futuristic high-tech system, obsidian hardware, glowing fiber optic conduits',
+    suffix: ', deep obsidian hardware, glowing cybernetic fiber optic conduits, intricate microelectronics, quantum circuits, crisp cyan and violet accents, clean tech aesthetic, 8k, dark mode wallpaper aesthetic, ultra-sharp, no text, no letters, no watermark',
+  },
+  business: {
+    id: 'business',
+    name: 'Business',
+    icon: '💼',
+    description: 'Modern executive innovation pavilion, sleek glass architectural sanctuary',
+    suffix: ', modern architectural innovation glass pavilion, executive architectural design, subtle warm ambient lighting, panoramic high-floor twilight perspective, premium corporate aesthetic, 8k, no text, no logos',
+  },
+  minimal: {
+    id: 'minimal',
+    name: 'Minimal',
+    icon: '🎨',
+    description: 'Swiss Bauhaus minimalist digital art, clean geometric harmony',
+    suffix: ', Swiss Bauhaus minimalist digital art, clean geometric harmony, elegant muted gradient background, subtle metallic textures, uncluttered negative space, award-winning design, 8k, no text, no typography, no watermark',
+  },
+  custom: {
+    id: 'custom',
+    name: 'Custom',
+    icon: '✏️',
+    description: 'User-specified prompt guidelines and aesthetic constraints',
+    suffix: ', 8k, ultra-sharp, professional composition, no text, no watermark, no logos',
+  },
+  // Legacy aliases for backward compatibility with existing saved settings
   cinematic: {
     id: 'cinematic',
     name: 'Cinematic Tech',
@@ -246,89 +298,346 @@ const IMAGE_STYLES = {
 /**
  * Intelligent visual scene synthesizer:
  * Translates abstract software/tech topics into concrete, physical, cinematic visual descriptions.
- * Prevents diffusion models from drawing garbled text or creepy cartoon characters.
+ * Enforces strict post-image relevance:
+ * - Enterprise AI workflows -> realistic connected decision nodes & pipelines (NOT robot holding laptop)
+ * - Cybersecurity / Zero Trust -> cryptographic verification network topology (NOT hacker in hoodie)
+ * - Startups / Building -> founder reviewing telemetry & system blueprints (NOT generic handshake)
  */
-function buildVisualSceneConcept(topic, postContent) {
+function buildVisualSceneConcept(topic, postContent, customInstructions = '') {
   const t = (topic || '').toLowerCase();
   const c = (postContent || '').toLowerCase();
 
-  if (t.includes('ai') || t.includes('agent') || c.includes('agent') || c.includes('llm') || c.includes('model')) {
-    return 'Futuristic autonomous AI computing core pulsing with luminous sapphire and amber neural synapses, clean monolithic geometric architecture';
+  let concept = '';
+
+  // 1. Cybersecurity & Zero Trust (explicitly required)
+  if (t.includes('cyber') || t.includes('security') || c.includes('security') || c.includes('zero-trust') || c.includes('zero trust') || c.includes('encryption') || c.includes('vulnerability')) {
+    concept = 'Professional enterprise cybersecurity and zero-trust network topology visual, cryptographic verification nodes glowing softly, secure data enclave conduits with deep indigo and amber accents, high-precision technical visualization';
   }
-  if (t.includes('software') || t.includes('architecture') || c.includes('microservice') || c.includes('database') || c.includes('system') || c.includes('code') || c.includes('postgresql')) {
-    return 'Precision-engineered modular architectural framework with interconnecting optical data conduits and polished crystalline modules';
+  // 2. Enterprise AI & Autonomous Workflows (explicitly required: NOT a robot with a laptop)
+  else if (c.includes('enterprise workflow') || c.includes('agentic') || c.includes('workflow') || c.includes('autonomous agent') || (t.includes('ai') && c.includes('pipeline'))) {
+    concept = 'Enterprise AI automation and multi-agent reasoning flow visualizing interconnected decision nodes, stream data pipelines, sleek modern glass interface telemetry, sophisticated studio lighting';
   }
-  if (t.includes('leadership') || t.includes('building') || c.includes('founder') || c.includes('startup') || c.includes('scale') || c.includes('product')) {
-    return 'Spectacular panoramic high-floor modern innovation glass pavilion at dusk, overlooking a sleek glowing futuristic tech skyline';
+  // 3. AI, LLMs & Automation
+  else if (t.includes('ai') || t.includes('agent') || c.includes('llm') || c.includes('model') || c.includes('machine learning')) {
+    concept = 'Futuristic autonomous computing core pulsing with luminous sapphire and amber neural conduits, clean monolithic geometric architecture, precise data synthesis';
   }
-  if (t.includes('productivity') || t.includes('deep work') || c.includes('focus') || c.includes('routine') || c.includes('habit')) {
-    return 'High-end brutalist architectural study sanctuary, ultra-clean floating desk, ambient warm illumination, peaceful twilight reflection';
+  // 4. Databases & Backend Optimization (Postgres, indexes, caching, latency)
+  else if (c.includes('database') || c.includes('postgresql') || c.includes('query') || c.includes('index') || c.includes('sql') || c.includes('redis') || c.includes('cache')) {
+    concept = 'High-performance distributed database architecture, indexed query flow conduits, crystalline cache tiers, sleek titanium server racks with cool cyan illumination';
   }
-  if (t.includes('future') || c.includes('quantum') || c.includes('breakthrough') || c.includes('hardware')) {
-    return 'Quantum computing crystalline processor hovering in a pristine dark laboratory, intricate superconducting golden wire chandeliers';
+  // 5. Software Architecture & Clean Code
+  else if (t.includes('software') || t.includes('architecture') || c.includes('microservice') || c.includes('system') || c.includes('code') || c.includes('postgresql') || c.includes('api')) {
+    concept = 'Precision-engineered modular architectural framework with interconnecting optical data conduits and polished crystalline modules, clean modular tech design';
+  }
+  // 6. Startups & Founders & Building in Public (explicitly required: NOT a random stock office photo)
+  else if (t.includes('leadership') || t.includes('building') || c.includes('founder') || c.includes('startup') || c.includes('scale') || c.includes('product') || c.includes('business')) {
+    concept = 'Focused tech founder reviewing dynamic product telemetry and architecture blueprints in a high-floor modern innovation glass studio overlooking dusk city skyline, cinematic depth of field';
+  }
+  // 7. Productivity & Deep Work (explicitly required)
+  else if (t.includes('productivity') || t.includes('deep work') || c.includes('focus') || c.includes('routine') || c.includes('habit') || c.includes('distraction')) {
+    concept = 'Calm minimalist architectural workspace sanctuary, floating natural walnut desk, ambient daylight, clutter-free focus environment, peaceful twilight reflection';
+  }
+  // 8. Future of Technology & Quantum Computing
+  else if (t.includes('future') || c.includes('quantum') || c.includes('breakthrough') || c.includes('hardware')) {
+    concept = 'Quantum computing crystalline processor hovering in a pristine dark laboratory, intricate superconducting golden wire chandeliers';
+  } else {
+    concept = 'Sleek luxury technological installation with floating geometric structures, subtle optical light refractions and dark minimalist aesthetics';
   }
 
-  return 'Sleek luxury technological installation with floating geometric structures, subtle optical light refractions and dark minimalist aesthetics';
+  if (customInstructions && customInstructions.trim()) {
+    concept += `, ${customInstructions.trim()}`;
+  }
+
+  return concept;
 }
 
 /**
  * Create high-signal AI image prompt paired with negative prompt guards
  */
-function createImagePrompt(topic, postContent, styleKey = 'cinematic') {
-  const scene = buildVisualSceneConcept(topic, postContent);
-  const style = IMAGE_STYLES[styleKey] || IMAGE_STYLES.cinematic;
+function createImagePrompt(topic, postContent, styleKey = 'photorealistic', customInstructions = '') {
+  let selectedKey = styleKey || 'photorealistic';
+  if (selectedKey === 'auto') {
+    const t = (topic || '').toLowerCase();
+    if (t.includes('leadership') || t.includes('startup')) selectedKey = 'editorial';
+    else if (t.includes('productivity') || t.includes('deep work')) selectedKey = 'minimal';
+    else selectedKey = 'technology';
+  }
+
+  const style = IMAGE_STYLES[selectedKey] || IMAGE_STYLES.photorealistic;
+  const scene = buildVisualSceneConcept(topic, postContent, customInstructions);
   return `${scene}${style.suffix}`;
 }
 
 /**
- * Generate AI image:
- * 1. Attempts Google Gemini / Imagen 3 API if apiKey is available
- * 2. Uses Pollinations Flux AI with model=flux, enhance=true, aspect ratios, and negative constraints
+ * Save generated image buffer to public/assets/generated/
  */
-async function generateAiImage(imagePrompt, apiKey, options = {}) {
-  const styleKey = options.style || 'cinematic';
-  const aspectRatio = options.aspectRatio || '16:9';
-  const width = aspectRatio === '1:1' ? 1080 : 1200;
-  const height = aspectRatio === '1:1' ? 1080 : 675;
+function saveGeneratedImageBuffer(buffer, extension = 'jpg') {
+  try {
+    const genDir = path.join(__dirname, '..', 'public', 'assets', 'generated');
+    if (!fs.existsSync(genDir)) {
+      fs.mkdirSync(genDir, { recursive: true });
+    }
+    const filename = `flux_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${extension}`;
+    const filePath = path.join(genDir, filename);
+    fs.writeFileSync(filePath, buffer);
+    return `/assets/generated/${filename}`;
+  } catch (err) {
+    console.warn('[AI Image] Could not save buffer to disk:', err.message);
+    return null;
+  }
+}
 
-  let cleanPrompt = (imagePrompt || '').trim();
-  if (!cleanPrompt) {
-    cleanPrompt = createImagePrompt('AI & Automation Trends', '', styleKey);
+/**
+ * Generate image using Cloudflare Workers AI (FLUX.2 Dev as primary, FLUX.1 Schnell as fast fallback)
+ */
+async function generateWithCloudflareWorkersAi(promptText, options = {}) {
+  const settings = db.getSettings();
+  const accountId = options.cloudflareAccountId || settings.cloudflareAccountId || process.env.CLOUDFLARE_ACCOUNT_ID || '';
+  const apiToken = options.cloudflareApiToken || settings.cloudflareApiToken || process.env.CLOUDFLARE_API_TOKEN || '';
+  const model = options.model || settings.imageModel || 'flux-2-dev';
+
+  if (!accountId || !apiToken) {
+    throw new Error('Cloudflare Account ID or API Token is missing');
   }
 
-  // 1. If Gemini API key is provided, attempt Imagen 3 endpoint
-  if (apiKey) {
+  const cleanPrompt = (promptText || '').trim();
+
+  // Try FLUX.2 Dev first
+  if (model === 'flux-2-dev' || model.includes('flux-2')) {
     try {
-      console.log('[AI Image] Attempting Google Imagen 3 API with provided key...');
-      const imagenResult = await generateWithGoogleImagen(cleanPrompt, apiKey, aspectRatio);
-      if (imagenResult) {
-        console.log('[AI Image] ✅ Successfully generated image with Google Imagen 3');
+      console.log(`[AI Image] 🎨 Calling Cloudflare Workers AI FLUX.2 Dev (@cf/black-forest-labs/flux-2-dev)...`);
+      const form = new FormData();
+      form.append('prompt', cleanPrompt);
+      form.append('steps', '20');
+
+      const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/black-forest-labs/flux-2-dev`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+        },
+        body: form,
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`FLUX.2 Dev failed HTTP ${res.status}: ${errText.slice(0, 150)}`);
+      }
+
+      const data = await res.json();
+      if (data.success && data.result?.image) {
+        const base64Data = data.result.image;
+        const imgBuffer = Buffer.from(base64Data, 'base64');
+        const savedUrl = saveGeneratedImageBuffer(imgBuffer, 'jpg');
+        const dataUri = `data:image/jpeg;base64,${base64Data}`;
+
+        console.log(`[AI Image] ✅ FLUX.2 Dev generation succeeded (${imgBuffer.length} bytes)`);
         return {
-          imageUrl: imagenResult,
-          imagePrompt: cleanPrompt,
-          engine: 'Google Imagen 3',
-          style: styleKey,
-          aspectRatio,
+          imageUrl: savedUrl || dataUri,
+          dataUri,
+          engine: 'FLUX.2 Dev (Cloudflare Workers AI)',
+          model: '@cf/black-forest-labs/flux-2-dev',
         };
       }
-    } catch (err) {
-      console.warn('[AI Image] Google Imagen 3 notice (using Flux 4K fallback):', err.message);
+      throw new Error(data.errors?.[0]?.message || 'No image in FLUX.2 Dev response');
+    } catch (flux2Err) {
+      console.warn(`[AI Image] FLUX.2 Dev notice (${flux2Err.message}). Falling back to FLUX.1 Schnell...`);
     }
   }
 
-  // 2. High-Definition Flux AI Engine
-  console.log(`[AI Image] Generating tailored Flux AI 4K visual (Style: ${styleKey}, Aspect: ${aspectRatio})...`);
-  const encodedPrompt = encodeURIComponent(cleanPrompt.slice(0, 500));
-  const seed = Math.floor(Math.random() * 1000000);
-  const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&model=flux&enhance=true&nologo=true&seed=${seed}`;
+  // Fallback: Cloudflare FLUX.1 Schnell
+  console.log(`[AI Image] ⚡ Calling Cloudflare Workers AI FLUX.1 Schnell (@cf/black-forest-labs/flux-1-schnell)...`);
+  const schnellUrl = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/black-forest-labs/flux-1-schnell`;
+  const schnellRes = await fetch(schnellUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ prompt: cleanPrompt }),
+  });
 
-  return {
-    imageUrl: pollinationsUrl,
-    imagePrompt: cleanPrompt,
-    engine: 'Flux AI 4K',
-    style: styleKey,
-    aspectRatio,
-  };
+  if (!schnellRes.ok) {
+    const errText = await schnellRes.text();
+    throw new Error(`FLUX.1 Schnell failed HTTP ${schnellRes.status}: ${errText.slice(0, 150)}`);
+  }
+
+  const schnellData = await schnellRes.json();
+  if (schnellData.success && schnellData.result?.image) {
+    const base64Data = schnellData.result.image;
+    const imgBuffer = Buffer.from(base64Data, 'base64');
+    const savedUrl = saveGeneratedImageBuffer(imgBuffer, 'jpg');
+    const dataUri = `data:image/jpeg;base64,${base64Data}`;
+
+    console.log(`[AI Image] ✅ FLUX.1 Schnell generation succeeded (${imgBuffer.length} bytes)`);
+    return {
+      imageUrl: savedUrl || dataUri,
+      dataUri,
+      engine: 'FLUX.1 Schnell (Cloudflare Workers AI)',
+      model: '@cf/black-forest-labs/flux-1-schnell',
+    };
+  }
+
+  throw new Error(schnellData.errors?.[0]?.message || 'No image returned by Cloudflare Workers AI');
+}
+
+/**
+ * Validate image result
+ */
+function validateGeneratedImage(imageResult) {
+  if (!imageResult) return false;
+  if (!imageResult.imageUrl && !imageResult.dataUri) return false;
+  if (imageResult.dataUri && imageResult.dataUri.length < 500) return false;
+  return true;
+}
+
+/**
+ * Verify Cloudflare Account ID and API Token
+ */
+async function verifyCloudflareCredentials(accountId, apiToken) {
+  const settings = db.getSettings();
+  const accId = (accountId || settings.cloudflareAccountId || process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+  const token = (apiToken || settings.cloudflareApiToken || process.env.CLOUDFLARE_API_TOKEN || '').trim();
+
+  if (!accId || !token) {
+    return { valid: false, error: 'Both Account ID and API Token are required.' };
+  }
+  try {
+    // Check Workers AI endpoint directly since AI-scoped tokens have permissions for /ai/* rather than full account admin
+    const aiRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accId}/ai/models/search?search=flux`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const aiData = await aiRes.json();
+    if (aiRes.ok && aiData.success) {
+      const modelsFound = Array.isArray(aiData.result) ? aiData.result.map(m => m.name) : [];
+      const hasFlux2 = modelsFound.some(name => name.includes('flux-2-dev'));
+      return {
+        valid: true,
+        accountName: `Cloudflare Workers AI (${accId.slice(0, 6)}...)`,
+        accountId: accId,
+        modelsCount: modelsFound.length,
+        hasFlux2Dev: hasFlux2,
+      };
+    }
+
+    // Secondary fallback check for broader account tokens
+    const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accId}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const data = await res.json();
+    if (res.ok && data.success && data.result) {
+      return {
+        valid: true,
+        accountName: data.result.name || 'Cloudflare Account',
+        accountId: data.result.id,
+      };
+    }
+    const errMsg = aiData.errors?.[0]?.message || data.errors?.[0]?.message || `HTTP ${aiRes.status}: Verification failed`;
+    return { valid: false, error: errMsg };
+  } catch (err) {
+    return { valid: false, error: err.message };
+  }
+}
+
+/**
+ * Main AI Image Generation Pipeline:
+ * Priority 1: Cloudflare Workers AI FLUX.2 Dev (@cf/black-forest-labs/flux-2-dev)
+ * Priority 2: Cloudflare Workers AI FLUX.1 Schnell
+ * Priority 3: Google Imagen 3 (if Gemini API key provided)
+ * Priority 4: Pollinations Flux AI 4K
+ */
+async function generateAiImage(imagePrompt, apiKey, options = {}) {
+  const settings = db.getSettings();
+  const styleKey = options.style || settings.imageStyle || 'photorealistic';
+  const aspectRatio = options.aspectRatio || settings.aspectRatio || '16:9';
+  const customInstructions = options.customInstructions || settings.customImageInstructions || '';
+
+  let width = options.width || settings.imageWidth || (aspectRatio === '1:1' ? 1080 : aspectRatio === '4:5' ? 1080 : 1200);
+  let height = options.height || settings.imageHeight || (aspectRatio === '1:1' ? 1080 : aspectRatio === '4:5' ? 1350 : 675);
+
+  let cleanPrompt = (imagePrompt || '').trim();
+  if (!cleanPrompt) {
+    cleanPrompt = createImagePrompt(options.topic || 'AI & Automation Trends', options.postContent || '', styleKey, customInstructions);
+  }
+
+  const maxRetries = options.maxRetries !== undefined ? options.maxRetries : (settings.maxImageRetries || 2);
+  let attempts = 0;
+  let lastError = null;
+
+  while (attempts <= maxRetries) {
+    attempts++;
+    try {
+      // 1. Primary: Cloudflare Workers AI (FLUX.2 Dev & FLUX.1 Schnell)
+      const cfResult = await generateWithCloudflareWorkersAi(cleanPrompt, options);
+      if (validateGeneratedImage(cfResult)) {
+        return {
+          ...cfResult,
+          imagePrompt: cleanPrompt,
+          style: styleKey,
+          aspectRatio,
+          width,
+          height,
+        };
+      }
+    } catch (cfErr) {
+      lastError = cfErr;
+      console.warn(`[AI Image] Cloudflare Workers AI attempt ${attempts} warning: ${cfErr.message}`);
+    }
+
+    // 2. Secondary: Google Imagen 3 if Gemini key is available
+    const geminiKey = apiKey || settings.geminiApiKey || process.env.GEMINI_API_KEY;
+    if (geminiKey) {
+      try {
+        console.log('[AI Image] Attempting Google Imagen 3 fallback...');
+        const imagenResult = await generateWithGoogleImagen(cleanPrompt, geminiKey, aspectRatio);
+        if (imagenResult) {
+          console.log('[AI Image] ✅ Successfully generated image with Google Imagen 3');
+          return {
+            imageUrl: imagenResult,
+            dataUri: imagenResult,
+            imagePrompt: cleanPrompt,
+            engine: 'Google Imagen 3',
+            style: styleKey,
+            aspectRatio,
+            width,
+            height,
+          };
+        }
+      } catch (imagenErr) {
+        console.warn('[AI Image] Google Imagen 3 notice:', imagenErr.message);
+      }
+    }
+
+    // 3. Tertiary: Pollinations Flux AI 4K
+    try {
+      console.log(`[AI Image] Attempting Pollinations Flux AI fallback...`);
+      const encodedPrompt = encodeURIComponent(cleanPrompt.slice(0, 500));
+      const seed = Math.floor(Math.random() * 1000000);
+      const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&model=flux&enhance=true&nologo=true&seed=${seed}`;
+
+      return {
+        imageUrl: pollinationsUrl,
+        dataUri: null,
+        imagePrompt: cleanPrompt,
+        engine: 'Flux AI 4K (Pollinations)',
+        style: styleKey,
+        aspectRatio,
+        width,
+        height,
+      };
+    } catch (pollErr) {
+      lastError = pollErr;
+      console.warn('[AI Image] Pollinations fallback notice:', pollErr.message);
+    }
+  }
+
+  throw new Error(`AI Image Generation failed after ${attempts} attempts: ${lastError ? lastError.message : 'Unknown error'}`);
 }
 
 /**
@@ -430,9 +739,9 @@ function verifyGeminiKey(apiKey) {
 
 /**
  * Generate Post using Google Gemini API if key available,
- * or Staff Engineer Case Study Engine, accompanied by tailored AI visual.
+ * or Staff Engineer Case Study Engine, accompanied by tailored AI visual (FLUX.2 Dev / Cloudflare Workers AI).
  */
-async function generatePost({ topic = 'AI & Automation Trends', tone = 'engaging', customPrompt = '', customImagePrompt = '', style = 'cinematic', aspectRatio = '16:9', geminiApiKey = '' }) {
+async function generatePost({ topic = 'AI & Automation Trends', tone = 'engaging', customPrompt = '', customImagePrompt = '', style, aspectRatio, geminiApiKey = '' }) {
   const settings = db.getSettings();
   const apiKey = geminiApiKey || settings.geminiApiKey || process.env.GEMINI_API_KEY;
 
@@ -450,17 +759,43 @@ async function generatePost({ topic = 'AI & Automation Trends', tone = 'engaging
     postData = generateDynamicTemplate(topic, tone, customPrompt);
   }
 
-  // Construct image prompt with style and generate AI visual
-  const visualPrompt = customImagePrompt || postData.suggestedImagePrompt || createImagePrompt(postData.topic, postData.content, style);
-  const imageObj = await generateAiImage(visualPrompt, apiKey, { style, aspectRatio });
+  // Check if image generation is enabled
+  const isImageGenEnabled = settings.imageGenerationEnabled !== false;
+  let imageObj = null;
+
+  if (isImageGenEnabled) {
+    const visualStyle = style || settings.imageStyle || 'photorealistic';
+    const visualAspect = aspectRatio || settings.aspectRatio || '16:9';
+    const customInstructions = settings.customImageInstructions || '';
+    const visualPrompt = customImagePrompt || postData.suggestedImagePrompt || createImagePrompt(postData.topic, postData.content, visualStyle, customInstructions);
+
+    try {
+      imageObj = await generateAiImage(visualPrompt, apiKey, {
+        style: visualStyle,
+        aspectRatio: visualAspect,
+        topic: postData.topic,
+        postContent: postData.content,
+        customInstructions,
+      });
+    } catch (imgErr) {
+      console.warn('[AI Generator] Image generation warning:', imgErr.message);
+      // Fallback behavior: if publish-text is allowed, continue text-only
+      if (settings.imageFailureBehavior === 'publish-text') {
+        imageObj = null;
+      } else {
+        throw imgErr;
+      }
+    }
+  }
 
   return {
     ...postData,
-    imageUrl: imageObj.imageUrl,
-    imagePrompt: imageObj.imagePrompt,
-    imageEngine: imageObj.engine,
-    imageStyle: imageObj.style,
-    imageAspectRatio: imageObj.aspectRatio,
+    imageUrl: imageObj ? imageObj.imageUrl : null,
+    imageData: imageObj ? (imageObj.dataUri || null) : null,
+    imagePrompt: imageObj ? imageObj.imagePrompt : null,
+    imageEngine: imageObj ? imageObj.engine : null,
+    imageStyle: imageObj ? imageObj.style : null,
+    imageAspectRatio: imageObj ? imageObj.aspectRatio : null,
   };
 }
 
@@ -615,6 +950,9 @@ module.exports = {
   generateAiImage,
   createImagePrompt,
   verifyGeminiKey,
+  verifyCloudflareCredentials,
+  generateWithCloudflareWorkersAi,
+  validateGeneratedImage,
   IMAGE_STYLES,
   TEMPLATES_BY_TOPIC,
 };

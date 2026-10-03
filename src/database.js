@@ -28,6 +28,19 @@ const DEFAULT_DB = {
     defaultTone: 'engaging',
     geminiApiKey: process.env.GEMINI_API_KEY || '',
     targetType: 'person',
+    // Image Generation Automation Settings
+    imageGenerationEnabled: true,
+    autoGenerateImages: true,
+    imageModel: 'flux-2-dev',
+    imageStyle: 'photorealistic',
+    aspectRatio: '16:9',
+    imageWidth: 1200,
+    imageHeight: 675,
+    customImageInstructions: '',
+    imageFailureBehavior: 'publish-text', // 'retry', 'publish-text', 'keep-in-queue'
+    maxImageRetries: 2,
+    cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID || '',
+    cloudflareApiToken: process.env.CLOUDFLARE_API_TOKEN || '',
   },
   queue: [],
   history: [],
@@ -396,6 +409,7 @@ function getStats() {
     scheduleTime: db.settings.scheduleTime,
     scheduleDays: db.settings.scheduleDays,
     autopilotMode: db.settings.autopilotMode,
+    imageGenerationEnabled: db.settings.imageGenerationEnabled !== false,
     isVercel,
     hasCloudStorage,
   };

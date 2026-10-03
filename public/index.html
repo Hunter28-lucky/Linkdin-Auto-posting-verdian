@@ -201,47 +201,56 @@
 
             <!-- Visual Style Selector Grid -->
             <div class="visual-styles-grid" id="visual-styles-grid">
-              <div class="style-card active" data-style="cinematic">
+              <div class="style-card active" data-style="photorealistic">
                 <span class="style-icon">📸</span>
                 <div class="style-meta">
-                  <span class="style-name">Cinematic Tech</span>
-                  <span class="style-desc">Hasselblad 8k studio shot, dramatic lighting</span>
+                  <span class="style-name">Photorealistic</span>
+                  <span class="style-desc">Cinematic 35mm, natural studio lighting</span>
                 </div>
                 <div class="style-check">✓</div>
               </div>
 
-              <div class="style-card" data-style="glass-3d">
-                <span class="style-icon">💎</span>
+              <div class="style-card" data-style="editorial">
+                <span class="style-icon">📰</span>
                 <div class="style-meta">
-                  <span class="style-name">3D Glass & Titanium</span>
-                  <span class="style-desc">Octane render, frosted glass, floating cubes</span>
+                  <span class="style-name">Editorial</span>
+                  <span class="style-desc">Wired / Bloomberg magazine photography</span>
                 </div>
                 <div class="style-check">✓</div>
               </div>
 
-              <div class="style-card" data-style="cyber">
+              <div class="style-card" data-style="technology">
                 <span class="style-icon">⚡</span>
                 <div class="style-meta">
-                  <span class="style-name">Cybernetic Matrix</span>
-                  <span class="style-desc">Obsidian dark, glowing fiber optics, quantum nodes</span>
+                  <span class="style-name">Technology</span>
+                  <span class="style-desc">Obsidian hardware, glowing fiber optics</span>
                 </div>
                 <div class="style-check">✓</div>
               </div>
 
-              <div class="style-card" data-style="workspace">
-                <span class="style-icon">🏛️</span>
+              <div class="style-card" data-style="business">
+                <span class="style-icon">💼</span>
                 <div class="style-meta">
-                  <span class="style-name">Minimalist Sanctuary</span>
-                  <span class="style-desc">Architectural Digest desk, ambient blue hour</span>
+                  <span class="style-name">Business</span>
+                  <span class="style-desc">Modern glass innovation sanctuary</span>
                 </div>
                 <div class="style-check">✓</div>
               </div>
 
-              <div class="style-card" data-style="abstract">
+              <div class="style-card" data-style="minimal">
                 <span class="style-icon">🎨</span>
                 <div class="style-meta">
-                  <span class="style-name">Contemporary Bauhaus</span>
-                  <span class="style-desc">Swiss modern digital art, light ribbons</span>
+                  <span class="style-name">Minimal</span>
+                  <span class="style-desc">Swiss Bauhaus digital art, clean geometry</span>
+                </div>
+                <div class="style-check">✓</div>
+              </div>
+
+              <div class="style-card" data-style="auto">
+                <span class="style-icon">✨</span>
+                <div class="style-meta">
+                  <span class="style-name">Auto</span>
+                  <span class="style-desc">Contextual to post theme</span>
                 </div>
                 <div class="style-check">✓</div>
               </div>
@@ -252,8 +261,9 @@
               <div class="aspect-ratio-toggle">
                 <span class="toggle-label">Aspect:</span>
                 <div class="aspect-pills" id="aspect-ratio-selector">
-                  <button type="button" class="aspect-pill active" data-aspect="16:9">16:9 Banner</button>
+                  <button type="button" class="aspect-pill active" data-aspect="16:9">16:9 Landscape</button>
                   <button type="button" class="aspect-pill" data-aspect="1:1">1:1 Square</button>
+                  <button type="button" class="aspect-pill" data-aspect="4:5">4:5 Portrait</button>
                 </div>
               </div>
 
@@ -561,6 +571,120 @@
                 <button type="button" id="btn-save-gemini-key" class="btn btn-primary btn-sm">Save Key</button>
               </div>
             </div>
+          </div>
+
+          <!-- AUTOMATIC IMAGE GENERATION (FLUX.2 DEV & CLOUDFLARE) -->
+          <div class="settings-section mt-4" id="section-image-automation">
+            <div class="section-title-badge">
+              <h4 class="settings-head">🎨 Automatic Image Generation (FLUX.2 Dev)</h4>
+              <span class="badge-pill active-engine-pill">Cloudflare Workers AI</span>
+            </div>
+            <p class="form-hint">Configure automated visual generation integrated directly into the LinkedIn posting pipeline. New posts automatically receive tailored FLUX.2 Dev images prior to publishing.</p>
+
+            <form id="form-image-automation-settings" class="mt-3">
+              <div class="settings-toggle-row mb-3">
+                <div class="toggle-info">
+                  <label class="form-label font-bold" for="setting-image-gen-enabled">Image Generation Master Switch</label>
+                  <span class="form-hint">Enable or disable visual generation across all auto-posting and studio workflows</span>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setting-image-gen-enabled" checked>
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="settings-toggle-row mb-3">
+                <div class="toggle-info">
+                  <label class="form-label font-bold" for="setting-auto-gen-images">Generate Images Automatically</label>
+                  <span class="form-hint">Automatically attach a FLUX.2 Dev image whenever posts are scheduled, queued, or triggered</span>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setting-auto-gen-images" checked>
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="form-row-2 mb-3">
+                <div class="form-group">
+                  <label class="form-label" for="setting-image-model">AI Image Model</label>
+                  <select id="setting-image-model" class="form-control select-control">
+                    <option value="flux-2-dev" selected>FLUX.2 Dev (Cloudflare Workers AI - Highest Quality)</option>
+                    <option value="flux-1-schnell">FLUX.1 Schnell (Cloudflare Workers AI - Fast)</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="setting-image-style">Default Image Style</label>
+                  <select id="setting-image-style" class="form-control select-control">
+                    <option value="auto">Auto (Contextual to post theme)</option>
+                    <option value="photorealistic" selected>Photorealistic (Cinematic Studio)</option>
+                    <option value="editorial">Professional Editorial (Wired / Bloomberg)</option>
+                    <option value="technology">Technology (Futuristic Obsidian & Optics)</option>
+                    <option value="business">Business (Modern Glass Innovation Pavilion)</option>
+                    <option value="minimal">Minimal (Swiss Bauhaus Modern)</option>
+                    <option value="custom">Custom Instructions</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-row-3 mb-3">
+                <div class="form-group">
+                  <label class="form-label" for="setting-aspect-ratio">Aspect Ratio</label>
+                  <select id="setting-aspect-ratio" class="form-control select-control">
+                    <option value="16:9" selected>LinkedIn Landscape (16:9)</option>
+                    <option value="1:1">Square (1:1)</option>
+                    <option value="4:5">Portrait (4:5)</option>
+                    <option value="custom">Custom Dimensions</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="setting-image-width">Width (px)</label>
+                  <input type="number" id="setting-image-width" class="form-control" value="1200">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="setting-image-height">Height (px)</label>
+                  <input type="number" id="setting-image-height" class="form-control" value="675">
+                </div>
+              </div>
+
+              <div class="form-group mb-3">
+                <label class="form-label" for="setting-custom-image-instructions">Custom Image Instructions (Optional)</label>
+                <textarea id="setting-custom-image-instructions" class="form-control" rows="2" placeholder="e.g. Crisp dark mode aesthetic, minimal titanium accents, studio lighting, no text..."></textarea>
+              </div>
+
+              <div class="form-group mb-3">
+                <label class="form-label" for="setting-failure-behavior">Failure Behavior</label>
+                <select id="setting-failure-behavior" class="form-control select-control">
+                  <option value="publish-text" selected>Publish text-only (Ensure post is not missed)</option>
+                  <option value="retry">Retry image generation (Up to 2 times)</option>
+                  <option value="keep-in-queue">Keep in queue (Mark as requiring attention)</option>
+                </select>
+                <span class="form-hint">Controls what happens if image generation fails or network times out during auto-publishing.</span>
+              </div>
+
+              <div class="cloudflare-creds-card mb-3">
+                <h5 class="settings-subhead">⚡ Cloudflare Workers AI Credentials</h5>
+                <p class="form-hint">Used to power FLUX.2 Dev directly on Cloudflare's serverless edge GPUs.</p>
+                <div class="form-row-2 mt-2">
+                  <div class="form-group">
+                    <label class="form-label" for="setting-cf-account-id">Cloudflare Account ID</label>
+                    <input type="text" id="setting-cf-account-id" class="form-control" placeholder="16144cbefdbba239ea81d6d45f5a9983">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="setting-cf-api-token">Cloudflare API Token (Account-Scoped)</label>
+                    <input type="password" id="setting-cf-api-token" class="form-control" placeholder="cfat_...">
+                  </div>
+                </div>
+                <div class="cf-action-row mt-2">
+                  <button type="button" id="btn-test-cloudflare" class="btn btn-outline btn-sm">⚡ Test Cloudflare Connection</button>
+                  <span id="cf-test-result" class="test-result-label hidden"></span>
+                </div>
+              </div>
+
+              <button type="submit" id="btn-save-image-settings" class="btn btn-primary btn-sm">💾 Save Image Automation Settings</button>
+            </form>
           </div>
 
           <div class="settings-section mt-4">

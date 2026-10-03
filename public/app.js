@@ -214,6 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initScheduleForm();
   initManualTokenForm();
   initSettingsKey();
+  initImageAutomationSettings();
   initGeminiModal();
   updateEngineBadgeUI();
 
@@ -858,6 +859,132 @@ function initSettingsKey() {
   });
 }
 
+function initImageAutomationSettings() {
+  const form = document.getElementById('form-image-automation-settings');
+  const aspectSelect = document.getElementById('setting-aspect-ratio');
+  const widthInput = document.getElementById('setting-image-width');
+  const heightInput = document.getElementById('setting-image-height');
+  const testCfBtn = document.getElementById('btn-test-cloudflare');
+  const cfResult = document.getElementById('cf-test-result');
+
+  // Auto-fill width/height when aspect ratio changes
+  if (aspectSelect && widthInput && heightInput) {
+    aspectSelect.addEventListener('change', (e) => {
+      const val = e.target.value;
+      if (val === '16:9') {
+        widthInput.value = 1200;
+        heightInput.value = 675;
+      } else if (val === '1:1') {
+        widthInput.value = 1080;
+        heightInput.value = 1080;
+      } else if (val === '4:5') {
+        widthInput.value = 1080;
+        heightInput.value = 1350;
+      }
+    });
+  }
+
+  // Test Cloudflare Connection
+  if (testCfBtn) {
+    testCfBtn.addEventListener('click', async () => {
+      const accountId = document.getElementById('setting-cf-account-id')?.value?.trim();
+      const apiToken = document.getElementById('setting-cf-api-token')?.value?.trim();
+
+      if (!accountId || !apiToken) {
+        showToast('Please provide both Cloudflare Account ID and API Token', 'error');
+        return;
+      }
+
+      testCfBtn.disabled = true;
+      testCfBtn.textContent = '⏳ Testing Edge GPU...';
+      if (cfResult) cfResult.classList.add('hidden');
+
+      try {
+        const res = await apiFetch('/api/ai/verify-cloudflare', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accountId, apiToken }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (cfResult) {
+            cfResult.className = 'test-result-label success';
+            cfResult.textContent = `✅ Connected to ${data.accountName}! FLUX.2 Dev active.`;
+            cfResult.classList.remove('hidden');
+          }
+          showToast(`Cloudflare Workers AI connected successfully! ⚡`, 'success');
+        } else {
+          if (cfResult) {
+            cfResult.className = 'test-result-label error';
+            cfResult.textContent = `❌ ${data.error || 'Connection failed'}`;
+            cfResult.classList.remove('hidden');
+          }
+          showToast(data.error || 'Connection test failed', 'error');
+        }
+      } catch (err) {
+        if (cfResult) {
+          cfResult.className = 'test-result-label error';
+          cfResult.textContent = `❌ Network error: ${err.message}`;
+          cfResult.classList.remove('hidden');
+        }
+        showToast(`Test error: ${err.message}`, 'error');
+      } finally {
+        testCfBtn.disabled = false;
+        testCfBtn.textContent = '⚡ Test Cloudflare Connection';
+      }
+    });
+  }
+
+  // Save Settings
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const saveBtn = document.getElementById('btn-save-image-settings');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+      }
+
+      const payload = {
+        imageGenerationEnabled: document.getElementById('setting-image-gen-enabled')?.checked ?? true,
+        autoGenerateImages: document.getElementById('setting-auto-gen-images')?.checked ?? true,
+        imageModel: document.getElementById('setting-image-model')?.value || 'flux-2-dev',
+        imageStyle: document.getElementById('setting-image-style')?.value || 'photorealistic',
+        aspectRatio: document.getElementById('setting-aspect-ratio')?.value || '16:9',
+        imageWidth: parseInt(document.getElementById('setting-image-width')?.value, 10) || 1200,
+        imageHeight: parseInt(document.getElementById('setting-image-height')?.value, 10) || 675,
+        customImageInstructions: document.getElementById('setting-custom-image-instructions')?.value || '',
+        imageFailureBehavior: document.getElementById('setting-failure-behavior')?.value || 'publish-text',
+        cloudflareAccountId: document.getElementById('setting-cf-account-id')?.value?.trim() || '',
+        cloudflareApiToken: document.getElementById('setting-cf-api-token')?.value?.trim() || '',
+      };
+
+      try {
+        const res = await apiFetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Image automation settings saved successfully! 🎨', 'success');
+          state.selectedStyle = payload.imageStyle;
+          state.selectedAspectRatio = payload.aspectRatio;
+        } else {
+          showToast(data.error || 'Failed to save settings', 'error');
+        }
+      } catch (err) {
+        showToast(`Save error: ${err.message}`, 'error');
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = '💾 Save Image Automation Settings';
+        }
+      }
+    });
+  }
+}
+
 function updateEngineBadgeUI() {
   const badgeBtn = document.getElementById('btn-open-gemini-modal');
   const label = document.getElementById('engine-status-text');
@@ -1026,10 +1153,47 @@ async function fetchStatus() {
 
     updateAuthUI(isConnected, user);
 
-    // Sync Gemini API key if present on backend
-    if (data.settings?.geminiApiKey && !getStoredGeminiKey()) {
-      setStoredGeminiKey(data.settings.geminiApiKey);
-      updateEngineBadgeUI();
+    // Sync settings if present on backend
+    if (data.settings) {
+      const s = data.settings;
+      if (s.geminiApiKey && !getStoredGeminiKey()) {
+        setStoredGeminiKey(s.geminiApiKey);
+        updateEngineBadgeUI();
+      }
+
+      // Populate image automation settings
+      const genEnabled = document.getElementById('setting-image-gen-enabled');
+      if (genEnabled) genEnabled.checked = s.imageGenerationEnabled !== false;
+
+      const autoGen = document.getElementById('setting-auto-gen-images');
+      if (autoGen) autoGen.checked = s.autoGenerateImages !== false;
+
+      const modelSelect = document.getElementById('setting-image-model');
+      if (modelSelect && s.imageModel) modelSelect.value = s.imageModel;
+
+      const styleSelect = document.getElementById('setting-image-style');
+      if (styleSelect && s.imageStyle) styleSelect.value = s.imageStyle;
+
+      const aspectSelect = document.getElementById('setting-aspect-ratio');
+      if (aspectSelect && s.aspectRatio) aspectSelect.value = s.aspectRatio;
+
+      const widthInput = document.getElementById('setting-image-width');
+      if (widthInput && s.imageWidth) widthInput.value = s.imageWidth;
+
+      const heightInput = document.getElementById('setting-image-height');
+      if (heightInput && s.imageHeight) heightInput.value = s.imageHeight;
+
+      const customInstr = document.getElementById('setting-custom-image-instructions');
+      if (customInstr && s.customImageInstructions !== undefined) customInstr.value = s.customImageInstructions;
+
+      const failBehavior = document.getElementById('setting-failure-behavior');
+      if (failBehavior && s.imageFailureBehavior) failBehavior.value = s.imageFailureBehavior;
+
+      const cfAccount = document.getElementById('setting-cf-account-id');
+      if (cfAccount && s.cloudflareAccountId) cfAccount.value = s.cloudflareAccountId;
+
+      const cfToken = document.getElementById('setting-cf-api-token');
+      if (cfToken && s.cloudflareApiToken) cfToken.value = s.cloudflareApiToken;
     }
 
     // Update disconnect button
@@ -1044,7 +1208,6 @@ async function fetchStatus() {
 
   } catch (err) {
     console.error('Failed to fetch status:', err);
-    // If network or serverless error, still preserve authenticated local state
     const storedAuth = getStoredAuth();
     if (storedAuth && storedAuth.token) {
       updateAuthUI(true, storedAuth);
@@ -1056,7 +1219,7 @@ async function fetchQueue() {
   try {
     const res = await apiFetch('/api/queue');
     const data = await res.json();
-    state.queue = data.queue || [];
+    state.queue = Array.isArray(data) ? data : (data.queue || []);
 
     const counter = document.getElementById('nav-queue-count');
     if (counter) counter.textContent = state.queue.length;
@@ -1078,9 +1241,13 @@ async function fetchQueue() {
       .map(
         (item) => `
       <div class="queue-item-card">
-        ${item.imageUrl ? `<img src="${item.imageUrl}" class="queue-thumb" alt="Visual" onerror="this.style.display='none'">` : '<div class="queue-thumb" style="background:#131d33; display:flex; align-items:center; justify-content:center; color:#64748b;">No Image</div>'}
+        ${item.imageUrl ? `<img src="${item.imageUrl}" class="queue-thumb" alt="Visual" onerror="this.style.display='none'">` : '<div class="queue-thumb" style="background:#131d33; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:0.7rem; text-align:center;">No Image</div>'}
         <div class="queue-info">
-          <span class="queue-topic-badge">${item.topic || 'General'}</span>
+          <div style="display:flex; gap:0.5rem; align-items:center; margin-bottom:0.25rem;">
+            <span class="queue-topic-badge">${item.topic || 'General'}</span>
+            ${item.imageUrl ? `<span style="font-size:0.72rem; color:#6ee7b7; background:rgba(16,185,129,0.12); padding:2px 6px; border-radius:4px;">✨ ${item.imageEngine || 'FLUX.2 Dev'}</span>` : ''}
+            ${item.status === 'needs_attention' ? `<span style="font-size:0.72rem; color:#fca5a5; background:rgba(244,63,94,0.15); padding:2px 6px; border-radius:4px;">⚠️ Requires Attention</span>` : ''}
+          </div>
           <p class="queue-snippet">${item.content}</p>
         </div>
         <div class="queue-actions">
@@ -1129,7 +1296,7 @@ async function fetchHistory() {
   try {
     const res = await apiFetch('/api/history');
     const data = await res.json();
-    state.history = data.history || [];
+    state.history = Array.isArray(data) ? data : (data.history || []);
 
     const tbody = document.getElementById('history-table-body');
     if (!tbody) return;
