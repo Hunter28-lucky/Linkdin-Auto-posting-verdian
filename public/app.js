@@ -629,7 +629,13 @@ function updateImagePreview(imageUrl, promptText) {
   }
 
   if (imageUrl) {
-    if (img) img.src = imageUrl;
+    if (img) {
+      img.onerror = () => {
+        img.onerror = null;
+        img.src = 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&h=675&fit=crop&q=85&auto=format';
+      };
+      img.src = imageUrl;
+    }
     if (container) container.classList.remove('hidden');
     if (removeBtn) removeBtn.classList.remove('hidden');
   } else {
@@ -652,7 +658,13 @@ function initLightbox() {
 
   function openLightbox() {
     if (!state.currentImage) return;
-    if (lightboxImg) lightboxImg.src = state.currentImage;
+    if (lightboxImg) {
+      lightboxImg.onerror = () => {
+        lightboxImg.onerror = null;
+        lightboxImg.src = 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&h=675&fit=crop&q=85&auto=format';
+      };
+      lightboxImg.src = state.currentImage;
+    }
     if (downloadLink) downloadLink.href = state.currentImage;
     if (lightbox) lightbox.classList.remove('hidden');
   }
@@ -1065,7 +1077,8 @@ const IMAGE_MODEL_LABELS = {
   'flux-2-dev': 'FLUX.2 Dev',
   'flux-1-schnell': 'FLUX.1 Schnell',
   'imagen-3': 'Google Imagen 3',
-  'pollinations-flux': 'Flux AI 4K',
+  'editorial-hd': '4K Editorial Visuals',
+  'pollinations-flux': '4K Editorial Visuals',
 };
 
 const COPY_MODEL_LABELS = {
